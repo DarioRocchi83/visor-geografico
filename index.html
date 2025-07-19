@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Visor Geográfico</title>
+    <title>Visor Geográfico Mejorado</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -37,6 +37,7 @@
             padding: 10px;
             border-radius: 5px;
             box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            max-width: 270px; /* Añadido para que no se haga muy ancho */
         }
         .info-panel input {
             width: 250px;
@@ -50,9 +51,14 @@
             color: white;
             border: none;
             cursor: pointer;
+            margin-top: 5px;
         }
         .info-panel button:hover {
             background-color: #0056b3;
+        }
+        /* Estilo para el control de capas para que no se superponga con el panel de info */
+        .leaflet-top.leaflet-right {
+            top: 10px;
         }
     </style>
 </head>
@@ -60,7 +66,7 @@
 
     <!-- HERRAMIENTAS DE LA INTERFAZ -->
     <div class="info-panel">
-        <input type="text" id="buscador" placeholder="Buscar por cuenta, nomenclatura...">
+        <input type="text" id="buscador" placeholder="Buscar en todos los campos de los puntos...">
         <button id="descargarKML">Descargar Puntos Visibles (KML)</button>
     </div>
 
@@ -71,14 +77,42 @@
     <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
     <script>
         // ==================================================================
-        // 1. INICIALIZACIÓN DEL MAPA
+        // 1. INICIALIZACIÓN DEL MAPA Y CAPAS BASE (MEJORA 3)
         // ==================================================================
-        var map = L.map('map').setView([-32.88, -68.84], 13); // Centrado en Mendoza, ajústalo a tu zona
-
-        // Capa de mapa base (OpenStreetMap es gratis)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        
+        // Definimos las capas de mapa base que el usuario podrá elegir
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        });
+
+        var satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>'
+        });
+        
+        var hibrido = L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+                attribution: '© <a href="https://carto.com/attributions">CARTO</a>',
+                pane: 'shadowPane' // Asegura que las etiquetas se muestren por encima de la imagen satelital
+            })
+        ]);
+
+        var baseMaps = {
+            "Calles": osm,
+            "Satélite": satelite,
+            "Híbrido": hibrido
+        };
+        
+        // Inicializamos el mapa
+        var map = L.map('map', {
+            center: [-32.88, -68.84], // Centrado en Mendoza, ajústalo a tu zona
+            zoom: 13,
+            layers: [osm] // Capa que se muestra por defecto al cargar
+        });
+
+        // Hacemos que el panel de etiquetas del mapa híbrido esté por encima
+        map.createPane('shadowPane');
+        map.getPane('shadowPane').style.zIndex = 650;
 
 
         // ==================================================================
@@ -100,12 +134,17 @@
 
 
         // ==================================================================
-        // 3. CARGA DE DATOS
+        // 3. CARGA DE DATOS Y CONTROL DE CAPAS (MEJORA 1 y 2)
         // ==================================================================
         
-        // Arrays para guardar nuestros datos
+        // Arrays y Grupos de Capas
         const todosLosMarcadores = []; // Contendrá TODOS los marcadores de los CSV
-        const layerGroupPuntos = L.layerGroup().addTo(map); // Capa que mostrará los puntos filtrados
+        const layerGroupPuntos = L.layerGroup().addTo(map); // Capa para los puntos, se añade al mapa por defecto
+        
+        // Objeto para las capas que se podrán activar/desactivar (Overlays)
+        var overlayMaps = {
+            "Puntos (Cuentas)": layerGroupPuntos
+        };
 
         // --- Cargar Puntos desde Google Sheets (CSV) ---
         const urlsSheets = [
@@ -124,13 +163,9 @@
                             const lat = parseFloat(String(punto.latitud).replace(',', '.'));
                             const lon = parseFloat(String(punto.longitud).replace(',', '.'));
 
-                            // Crear el marcador sin añadirlo al mapa directamente
                             const marker = L.marker([lat, lon]);
-                            
-                            // Guardamos todos los datos del punto dentro del marcador para usarlos después
                             marker.datos = punto; 
 
-                            // Crear el contenido del popup (la ventana de información)
                             let popupContent = `
                                 <b>Número de Cuenta:</b> ${punto['Número de Cuenta'] || 'No disponible'}<br>
                                 <b>Nomenclatura Castral:</b> ${punto['Nomenclatura Castral'] || 'No disponible'}<br>
@@ -140,10 +175,7 @@
                             `;
                             marker.bindPopup(popupContent);
                             
-                            // Guardamos el marcador en nuestro array principal
                             todosLosMarcadores.push(marker);
-                            
-                            // Lo añadimos a la capa visible por defecto
                             layerGroupPuntos.addLayer(marker);
                         }
                     });
@@ -152,42 +184,60 @@
         });
 
         // --- Cargar Líneas/Polígonos desde Google Drive (KML/KMZ) ---
-        // ¡RECUERDA CAMBIAR ESTAS URLS POR LAS TUYAS!
-        // El formato debe ser: https://drive.google.com/uc?export=download&id=ID_DEL_ARCHIVO
-        const urlsKml = [
-            'https://drive.google.com/uc?export=download&id=1Ys6x-NI3FdsXKfuKtCxEtE3VdDNRFll0',
-            'https://drive.google.com/uc?export=download&id=13IIBzFYKQPhorU5BvZ0bN4VNEQ-KfsoS'
-            // Puedes añadir más URLs de tus KML/KMZ aquí
+        // ¡IMPORTANTE! PARA QUE ESTO FUNCIONE, CADA ARCHIVO EN GOOGLE DRIVE DEBE ESTAR
+        // COMPARTIDO COMO "CUALQUIER PERSONA CON EL ENLACE PUEDE VER".
+        const kmlData = [
+            { name: "Polígonos KML 1", url: 'https://drive.google.com/uc?export=download&id=1Ys6x-NI3FdsXKfuKtCxEtE3VdDNRFll0' },
+            { name: "Líneas KML 2", url: 'https://drive.google.com/uc?export=download&id=13IIBzFYKQPhorU5BvZ0bN4VNEQ-KfsoS' }
+            // Puedes añadir más KML/KMZ aquí, dándoles un nombre para el menú de capas
         ];
 
-        urlsKml.forEach(url => {
-            omnivore.kml(url).addTo(map);
+        kmlData.forEach(item => {
+            // Creamos una capa para este KML específico
+            const kmlLayer = omnivore.kml(item.url)
+                .on('ready', function() {
+                    // Cuando la capa está lista, la añadimos al mapa
+                    this.addTo(map);
+                    console.log(`Capa KML "${item.name}" cargada correctamente.`);
+                })
+                .on('error', function() {
+                    // Si hay un error (muy común con Google Drive si no está bien compartido)
+                    console.error(`ERROR: No se pudo cargar la capa KML "${item.name}". Verifica que el enlace sea correcto y que el archivo esté compartido públicamente.`);
+                    alert(`ERROR: No se pudo cargar la capa KML "${item.name}". \n\nPor favor, verifica en Google Drive que el archivo esté compartido con la opción "Cualquier persona con el enlace".`);
+                });
+
+            // Añadimos la capa al control de capas para poder activarla/desactivarla
+            overlayMaps[item.name] = kmlLayer;
         });
 
+        // AÑADIMOS EL CONTROL DE CAPAS AL MAPA
+        L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
+
 
         // ==================================================================
-        // 4. FUNCIONALIDAD DE LAS HERRAMIENTAS
+        // 4. FUNCIONALIDAD DE LAS HERRAMIENTAS (MEJORA 4)
         // ==================================================================
 
-        // --- Lógica del Buscador ---
+        // --- Lógica del Buscador (Mejorada) ---
         document.getElementById('buscador').addEventListener('keyup', function(e) {
-            const textoBusqueda = e.target.value.toLowerCase();
+            const textoBusqueda = e.target.value.toLowerCase().trim();
             
-            layerGroupPuntos.clearLayers(); // Limpiamos los puntos visibles
+            layerGroupPuntos.clearLayers();
+
+            if (textoBusqueda === "") {
+                // Si no hay búsqueda, mostramos todos los marcadores
+                todosLosMarcadores.forEach(marcador => layerGroupPuntos.addLayer(marcador));
+                return;
+            }
 
             const marcadoresFiltrados = todosLosMarcadores.filter(marcador => {
-                // Obtenemos los datos guardados en el marcador
-                const cuenta = String(marcador.datos['Número de Cuenta'] || '').toLowerCase();
-                const catastral = String(marcador.datos['Nomenclatura Castral'] || '').toLowerCase();
-                const oficial = String(marcador.datos['Nomenclatura Oficial'] || '').toLowerCase();
-
-                // Devolvemos true si el texto de búsqueda está en alguno de los campos
-                return cuenta.includes(textoBusqueda) || 
-                       catastral.includes(textoBusqueda) || 
-                       oficial.includes(textoBusqueda);
+                // Iteramos sobre todos los valores de los datos del marcador
+                // y comprobamos si alguno contiene el texto de búsqueda.
+                return Object.values(marcador.datos).some(valor => 
+                    String(valor).toLowerCase().includes(textoBusqueda)
+                );
             });
 
-            // Añadimos solo los marcadores filtrados a la capa visible
             marcadoresFiltrados.forEach(marcador => {
                 layerGroupPuntos.addLayer(marcador);
             });
@@ -195,29 +245,31 @@
 
         // --- Lógica para Descargar KML ---
         document.getElementById('descargarKML').addEventListener('click', function() {
-            // Creamos un GeoJSON a partir de los puntos que están visibles en el mapa
             let featureCollection = layerGroupPuntos.toGeoJSON();
 
-            // Añadimos los datos de cada punto al GeoJSON para que se exporten en el KML
             featureCollection.features.forEach((feature, index) => {
                 let marcadorOriginal = layerGroupPuntos.getLayers()[index];
-                feature.properties = {
-                    'name': marcadorOriginal.datos['Número de Cuenta'] || 'Sin cuenta',
-                    'description': `
-                        <b>Nomenclatura Castral:</b> ${marcadorOriginal.datos['Nomenclatura Castral'] || ''}<br>
-                        <b>Nomenclatura Oficial:</b> ${marcadorOriginal.datos['Nomenclatura Oficial'] || ''}<br>
-                        <b>Observaciones:</b> ${marcadorOriginal.datos.observaciones || ''}
-                    `
-                };
+                if (marcadorOriginal && marcadorOriginal.datos) {
+                    feature.properties = {
+                        'name': marcadorOriginal.datos['Número de Cuenta'] || 'Sin cuenta',
+                        'description': `
+                            <b>Número de Cuenta:</b> ${marcadorOriginal.datos['Número de Cuenta'] || ''}<br>
+                            <b>Nomenclatura Castral:</b> ${marcadorOriginal.datos['Nomenclatura Castral'] || ''}<br>
+                            <b>Nomenclatura Oficial:</b> ${marcadorOriginal.datos['Nomenclatura Oficial'] || ''}<br>
+                            <b>Carpeta Interna:</b> ${marcadorOriginal.datos['Carpeta Interna'] || ''}<br>
+                            <b>Observaciones:</b> ${marcadorOriginal.datos.observaciones || ''}
+                        `
+                    };
+                }
             });
             
-            // Convertimos el GeoJSON a formato KML
             const kmlString = tokml(featureCollection, {
                 name: 'name',
-                description: 'description'
+                description: 'description',
+                documentName: 'Puntos Visibles Exportados',
+                documentDescription: 'Puntos exportados desde el Visor Geográfico'
             });
 
-            // Creamos un archivo y forzamos su descarga
             const a = document.createElement('a');
             a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString);
             a.download = 'puntos_visibles.kml';
