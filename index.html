@@ -49,16 +49,6 @@
         .leaflet-top.leaflet-right {
             top: 10px;
         }
-        /* Estilo para indicar una capa que falló al cargar */
-        .layer-error-label {
-            text-decoration: line-through;
-            color: #999;
-        }
-        .layer-error-label:after {
-            content: " (Error)";
-            color: red;
-            font-style: italic;
-        }
     </style>
 </head>
 <body>
@@ -79,7 +69,7 @@
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { attribution: '© <a href="https://carto.com/attributions">CARTO</a>', pane: 'shadowPane' })
         ]);
         var baseMaps = { "Calles": osm, "Satélite": satelite, "Híbrido": hibrido };
-        var map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [osm] }); // Centrado en Córdoba, Arg.
+        var map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [osm] });
         map.createPane('shadowPane').style.zIndex = 650;
 
         // 2. INICIALIZACIÓN DE HERRAMIENTAS
@@ -115,35 +105,45 @@
             });
         });
 
-        // --- Cargar Líneas/Polígonos desde Google Drive (KML/KMZ) - MÉTODO MÁS ROBUSTO ---
+        // --- Cargar Líneas/Polígonos desde Google Drive (KML/KMZ) ---
         const kmlData = [
-            { name: "RUTA 1", url: 'https://drive.google.com/uc?export=download&id=1Ys6x-NI3FdsXKfuKtCxEtE3VdDNRFll0' },
-            { name: "RUTA 2", url: 'https://drive.google.com/uc?export=download&id=13IIBzFYKQPhorU5BvZ0bN4VNEQ-KfsoS' }
+            { name: "RUTA 1", url: 'https://drive.google.com/uc?export=download&id=1Ys6x-NI3FdsXKfuKtCxEtE3VdDNRFll0', style: { color: 'blue', weight: 3 } },
+            { name: "RUTA 2", url: 'https://drive.google.com/uc?export=download&id=13IIBzFYKQPhorU5BvZ0bN4VNEQ-KfsoS', style: { color: 'red', weight: 2 } }
         ];
-        
-        // Creamos el control de capas ANTES de llenarlo con los KML
+
+        // Se crea el control de capas y se añade al mapa
         const layersControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
 
         kmlData.forEach(item => {
-            try {
-                const kmlLayer = omnivore.kml(item.url)
-                    .on('ready', function() {
-                        this.addTo(map); // Añadir al mapa por defecto al cargar
-                        layersControl.addOverlay(this, item.name); // Añadir al control de capas cuando esté lista
-                        console.log(`Capa KML "${item.name}" cargada correctamente.`);
-                    })
-                    .on('error', function() {
-                        console.error(`ERROR al cargar KML "${item.name}".`);
-                        // Marcar la capa como errónea en el control de capas
-                        const dummyLayer = L.layerGroup(); // Capa vacía para el control
-                        layersControl.addOverlay(dummyLayer, `<span class="layer-error-label">${item.name}</span>`);
+            // Se crea una capa GeoJSON vacía que actuará como contenedor
+            const kmlLayer = L.geoJson(null, {
+                // A cada elemento (línea/polígono) que se añada, se le aplica este estilo
+                style: function (feature) {
+                    // Si el KML ya trae un estilo, se respeta.
+                    // Si no (como en RUTA 1), se usa el estilo por defecto que definimos.
+                    return feature.properties.style || item.style;
+                }
+            }).addTo(map);
+
+            // Se añade la capa al control de capas inmediatamente
+            layersControl.addOverlay(kmlLayer, item.name);
+
+            // Se usa Omnivore para parsear el KML y se añaden los datos a nuestra capa GeoJSON
+            const runLayer = omnivore.kml(item.url)
+                .on('ready', function() {
+                    // Se itera sobre cada capa interna del KML parseado
+                    this.eachLayer(function(layer) {
+                        // Se añade el elemento a nuestra capa GeoJSON
+                        kmlLayer.addLayer(layer);
                     });
-            } catch (e) {
-                console.error(`Excepción al procesar KML "${item.name}":`, e);
-                const dummyLayer = L.layerGroup();
-                layersControl.addOverlay(dummyLayer, `<span class="layer-error-label">${item.name}</span>`);
-            }
+                    console.log(`Capa KML "${item.name}" cargada correctamente.`);
+                })
+                .on('error', function() {
+                    console.error(`ERROR al cargar o procesar KML "${item.name}".`);
+                    // Opcional: podrías mostrar un error visual si lo deseas, pero sin alertas.
+                });
         });
+
 
         // 4. FUNCIONALIDAD DE LAS HERRAMIENTAS
         document.getElementById('buscador').addEventListener('keyup', function(e) {
