@@ -115,34 +115,75 @@
         const layersControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
 
         kmlData.forEach(item => {
-            // Se crea una capa GeoJSON vacía que actuará como contenedor
             const kmlLayer = L.geoJson(null, {
-                // A cada elemento (línea/polígono) que se añada, se le aplica este estilo
                 style: function (feature) {
-                    // Si el KML ya trae un estilo, se respeta.
-                    // Si no (como en RUTA 1), se usa el estilo por defecto que definimos.
                     return feature.properties.style || item.style;
                 }
             }).addTo(map);
-
-            // Se añade la capa al control de capas inmediatamente
             layersControl.addOverlay(kmlLayer, item.name);
-
-            // Se usa Omnivore para parsear el KML y se añaden los datos a nuestra capa GeoJSON
             const runLayer = omnivore.kml(item.url)
                 .on('ready', function() {
-                    // Se itera sobre cada capa interna del KML parseado
-                    this.eachLayer(function(layer) {
-                        // Se añade el elemento a nuestra capa GeoJSON
-                        kmlLayer.addLayer(layer);
-                    });
+                    this.eachLayer(function(layer) { kmlLayer.addLayer(layer); });
                     console.log(`Capa KML "${item.name}" cargada correctamente.`);
                 })
                 .on('error', function() {
                     console.error(`ERROR al cargar o procesar KML "${item.name}".`);
-                    // Opcional: podrías mostrar un error visual si lo deseas, pero sin alertas.
                 });
         });
+
+        // --- INICIO: Carga de capa de Parcelas (GeoJSON) ---
+        const urlParcelasGeoJSON = 'https://drive.google.com/uc?export=download&id=1dbqNgOSq6c40b7fqti8BFMYVDL5w50wi';
+
+        // Estilo para las parcelas (polígonos)
+        const estiloParcelas = {
+            color: '#ff8c00',       // Borde naranja oscuro
+            weight: 2,              // Grosor del borde
+            opacity: 0.9,           // Opacidad del borde
+            fillColor: '#ffd700',   // Relleno dorado/amarillo
+            fillOpacity: 0.4        // Transparencia del relleno
+        };
+
+        // Creamos una capa GeoJSON vacía para las parcelas
+        const parcelasLayer = L.geoJson(null, {
+            style: estiloParcelas,
+            // Esta función se ejecuta para cada parcela individualmente
+            onEachFeature: function(feature, layer) {
+                // Creamos un popup que muestra dinámicamente toda la información disponible
+                let popupContent = '<h4>Datos de la Parcela</h4>';
+                if (feature.properties) {
+                    // Usamos una tabla para un formato más limpio
+                    popupContent += '<div style="max-height: 200px; overflow-y: auto;"><table>';
+                    for (const key in feature.properties) {
+                        // Mostramos solo las propiedades que tienen un valor
+                        if (feature.properties.hasOwnProperty(key) && feature.properties[key]) {
+                            popupContent += `<tr><td style="padding-right: 10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`;
+                        }
+                    }
+                    popupContent += '</table></div>';
+                }
+                layer.bindPopup(popupContent);
+            }
+        }).addTo(map); // Añadimos la capa al mapa
+
+        // Añadimos la capa al control de capas para poder activarla/desactivarla
+        layersControl.addOverlay(parcelasLayer, "Parcelas");
+
+        // Usamos fetch para cargar los datos del GeoJSON desde la URL
+        fetch(urlParcelasGeoJSON)
+            .then(response => {
+                if (!response.ok) { throw new Error('Error en la respuesta de red al cargar parcelas.'); }
+                return response.json(); // Convertimos la respuesta a formato JSON
+            })
+            .then(data => {
+                parcelasLayer.addData(data); // Añadimos los datos a nuestra capa GeoJSON
+                console.log("Capa GeoJSON de parcelas cargada correctamente.");
+                // Opcional: hacer zoom para que se vean todas las parcelas cargadas
+                // map.fitBounds(parcelasLayer.getBounds());
+            })
+            .catch(error => {
+                console.error('Error al cargar o procesar la capa de parcelas GeoJSON:', error);
+            });
+        // --- FIN: Carga de capa de Parcelas (GeoJSON) ---
 
 
         // 4. FUNCIONALIDAD DE LAS HERRAMIENTAS
