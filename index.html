@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Visor Geográfico Mejorado</title>
+    <title>Visor Geográfico Profesional</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -14,222 +14,189 @@
     <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@2.1.7/dist/leaflet-measure.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tokml@0.4.0/tokml.min.js"></script>
 
-    <!-- Estilos personalizados para la página -->
+    <!-- Estilos personalizados -->
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { height: 100vh; width: 100%; }
         .info-panel {
-            position: absolute;
-            top: 10px;
-            left: 50px;
-            z-index: 1000;
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
-            max-width: 270px;
+            position: absolute; top: 10px; left: 50px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65); max-width: 270px;
         }
-        .info-panel input {
-            width: 250px;
-            padding: 5px;
-            margin-bottom: 5px;
-        }
-        .info-panel button {
-            width: 100%;
-            padding: 8px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            margin-top: 5px;
-        }
-        .info-panel button:hover {
-            background-color: #0056b3;
-        }
-        .leaflet-top.leaflet-right {
-            top: 10px;
-        }
+        .info-panel input, .info-panel button { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 8px; }
+        .info-panel button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+        .info-panel button:hover { background-color: #0056b3; }
+        .info-panel .help-text { font-size: 0.8em; color: #555; margin-top: 5px; }
+        .leaflet-top.leaflet-right { top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="info-panel">
         <input type="text" id="buscador" placeholder="Buscar en todos los campos de los puntos...">
-        <button id="descargarKML">Descargar Puntos Visibles (KML)</button>
+        <button id="descargarSeleccion">Descargar Selección (KML)</button>
+        <p class="help-text">Haga clic en cualquier elemento del mapa para seleccionarlo/deseleccionarlo.</p>
     </div>
 
     <div id="map"></div>
 
     <script>
-        // 1. INICIALIZACIÓN DEL MAPA Y CAPAS BASE
-        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' });
-        var satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>' });
-        var hibrido = L.layerGroup([
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { attribution: '© <a href="https://carto.com/attributions">CARTO</a>', pane: 'shadowPane' })
-        ]);
-        var baseMaps = { "Calles": osm, "Satélite": satelite, "Híbrido": hibrido };
-        var map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [osm] });
+        // 1. INICIALIZACIÓN
+        const baseMaps = {
+            "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }),
+            "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>' }),
+            "Híbrido": L.layerGroup([
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { pane: 'shadowPane' })
+            ])
+        };
+        const map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [baseMaps.Calles] });
         map.createPane('shadowPane').style.zIndex = 650;
         
-        // Se crea el control de capas VACÍO. Las capas se añadirán después.
         const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
+        L.control.measure({ position: 'topright', primaryLengthUnit: 'meters', localization: 'es' }).addTo(map);
 
-        // 2. INICIALIZACIÓN DE HERRAMIENTAS
-        L.control.measure({ position: 'topright', primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers', primaryAreaUnit: 'sqmeters', secondaryAreaUnit: 'hectares', activeColor: '#db4a39', completedColor: '#ff5e4d', localization: 'es' }).addTo(map);
+        // 2. HERRAMIENTA DE SELECCIÓN
+        const selectedLayer = L.featureGroup().addTo(map);
+        const selectedStyle = { color: '#ffff00', weight: 5, opacity: 1 }; // Estilo amarillo brillante para selección
 
-        // 3. CARGA DE DATOS
-        
-        // --- INICIO: Carga de Puntos con colores y capas separadas ---
-
-        // NUEVO: Función para crear iconos de colores dinámicamente
-        function createColoredIcon(color) {
-            const svgTemplate = `
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="leaflet-marker-icon">
-                    <path fill="${color}" stroke="black" stroke-width="1.5" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path>
-                    <circle cx="16" cy="10" r="4" fill="white"/>
-                </svg>`;
-            return L.divIcon({
-                html: svgTemplate,
-                className: '', // para no usar estilos por defecto de leaflet
-                iconSize: [28, 28],
-                iconAnchor: [14, 28],
-                popupAnchor: [0, -28]
+        function makeFeatureSelectable(layer) {
+            layer.originalStyle = layer.options.style || layer.options; // Guardar estilo original
+            layer.on('click', function(e) {
+                if (selectedLayer.hasLayer(layer)) {
+                    selectedLayer.removeLayer(layer);
+                    if (layer.setStyle) layer.setStyle(layer.originalStyle); // Resetear estilo para polígonos/líneas
+                } else {
+                    selectedLayer.addLayer(layer);
+                    if (layer.setStyle) layer.setStyle(selectedStyle); // Aplicar estilo de selección
+                }
+                L.DomEvent.stopPropagation(e);
             });
         }
         
-        // MODIFICADO: Ahora definimos cada hoja con su nombre y color
+        // 3. CARGA DE DATOS DINÁMICA
+        const todosLosMarcadores = []; // Para la función de búsqueda
+        
+        // --- Carga de Puntos desde Google Sheets ---
         const sheetsData = [
-            {
-                name: "Cuentas Hoja 1",
-                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkDyVDpow7TJAolEUXcWVW9I-5ntVxnJbTdVClWQpP5bPSkbXlfFdUjytdtWWqyUT1qXiM_a6T4u9Y/pub?gid=0&single=true&output=csv',
-                color: '#007bff' // Azul
-            },
-            {
-                name: "Cuentas Hoja 2",
-                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4fd4H6m1wrYei8KWqjCZEavtRrPph5Z1dXZkhC67pj_cCDk5WCrSUYAVPg59JNKvvQXrYK8b8u-Wj/pub?gid=0&single=true&output=csv',
-                color: '#28a745' // Verde
-            }
+            { name: "Cuentas Hoja 1", url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkDyVDpow7TJAolEUXcWVW9I-5ntVxnJbTdVClWQpP5bPSkbXlfFdUjytdtWWqyUT1qXiM_a6T4u9Y/pub?gid=0&single=true&output=csv', color: '#007bff' },
+            { name: "Cuentas Hoja 2", url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4fd4H6m1wrYei8KWqjCZEavtRrPph5Z1dXZkhC67pj_cCDk5WCrSUYAVPg59JNKvvQXrYK8b8u-Wj/pub?gid=0&single=true&output=csv', color: '#28a745' }
         ];
 
-        const todosLosMarcadores = []; // Mantenemos un array con todos para el buscador
-        const pointLayers = {};       // NUEVO: Un objeto para guardar las capas de puntos separadas
+        function createColoredIcon(color, isSelected = false) {
+            const fillColor = isSelected ? '#ffff00' : color;
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="${fillColor}" stroke="black" stroke-width="1.5" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path><circle cx="16" cy="10" r="4" fill="white"/></svg>`;
+            return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] });
+        }
 
         sheetsData.forEach(sheet => {
-            // Creamos una capa para esta hoja específica
             const layerGroup = L.layerGroup().addTo(map);
-            pointLayers[sheet.name] = layerGroup;
-            layersControl.addOverlay(layerGroup, sheet.name); // Añadimos al control de capas
-
+            layersControl.addOverlay(layerGroup, sheet.name);
             Papa.parse(sheet.url, {
                 download: true, header: true,
-                complete: function(results) {
+                complete: results => {
                     results.data.forEach(punto => {
                         if (punto.latitud && punto.longitud) {
                             const lat = parseFloat(String(punto.latitud).replace(',', '.'));
                             const lon = parseFloat(String(punto.longitud).replace(',', '.'));
-                            
-                            // Creamos el marcador con el icono de color correspondiente
                             const marker = L.marker([lat, lon], { icon: createColoredIcon(sheet.color) });
-                            marker.datos = punto; // Guardamos los datos para el popup y búsqueda
-
-                            let popupContent = `<b>${sheet.name}</b><hr><b>Número de Cuenta:</b> ${punto['Número de Cuenta'] || ''}<br><b>Nomenclatura Castral:</b> ${punto['Nomenclatura Castral'] || ''}<br><b>Nomenclatura Oficial:</b> ${punto['Nomenclatura Oficial'] || ''}<br><b>Carpeta Interna:</b> ${punto['Carpeta Interna'] || ''}<br><b>Observaciones:</b> ${punto.observaciones || ''}`;
-                            marker.bindPopup(popupContent);
-                            
+                            marker.datos = { ...punto, capa: sheet.name }; // Guardamos datos y nombre de la capa
+                            marker.bindPopup(`<b>${sheet.name}</b><hr><b>N° Cuenta:</b> ${punto['Número de Cuenta'] || ''}<br><b>N. Catastral:</b> ${punto['Nomenclatura Castral'] || ''}`);
+                            layerGroup.addLayer(marker);
                             todosLosMarcadores.push(marker);
-                            layerGroup.addLayer(marker); // Añadimos el marcador a su capa específica
+
+                            // Lógica de selección para marcadores
+                            marker.on('click', function(e) {
+                                if (selectedLayer.hasLayer(marker)) {
+                                    selectedLayer.removeLayer(marker);
+                                    marker.setIcon(createColoredIcon(sheet.color, false));
+                                } else {
+                                    selectedLayer.addLayer(marker);
+                                    marker.setIcon(createColoredIcon(sheet.color, true));
+                                }
+                                L.DomEvent.stopPropagation(e);
+                            });
                         }
                     });
                 }
             });
         });
-        // --- FIN: Carga de Puntos ---
 
-
-        // --- INICIO: Carga de Rutas KML ---
+        // --- Carga de KML desde Google Drive ---
         const kmlData = [
             { name: "RUTA 1", url: 'https://drive.google.com/uc?export=download&id=1Ys6x-NI3FdsXKfuKtCxEtE3VdDNRFll0', style: { color: 'blue', weight: 3 } },
             { name: "RUTA 2", url: 'https://drive.google.com/uc?export=download&id=13IIBzFYKQPhorU5BvZ0bN4VNEQ-KfsoS', style: { color: 'red', weight: 2 } }
         ];
         kmlData.forEach(item => {
-            const kmlLayer = L.geoJson(null, { style: feature => feature.properties.style || item.style }).addTo(map);
+            const kmlLayer = L.geoJson(null, { 
+                style: feature => feature.properties.style || item.style,
+                onEachFeature: (feature, layer) => makeFeatureSelectable(layer)
+            }).addTo(map);
             layersControl.addOverlay(kmlLayer, item.name);
             omnivore.kml(item.url)
                 .on('ready', function() { this.eachLayer(layer => kmlLayer.addLayer(layer)); })
                 .on('error', () => console.error(`Error cargando KML: ${item.name}`));
         });
-        // --- FIN: Carga de Rutas KML ---
-        
-        
-        // --- INICIO: Carga de Parcela GeoJSON (incrustado para asegurar funcionamiento) ---
-        const datosParcelaGeoJSON = { "type": "FeatureCollection", "features": [ { "type": "Feature", "properties": { "Catastro_Córdoba": "<a href='http:\/\/mapascordoba.gob.ar\/api\/v1\/visualizadorcatastro\/gAAAAABofQEQn-8q3ZzDSYibh1IMts8T6Gvrt3FBZSX5Lw8JNzknaSH7yHE-HDulstXcBC6HmgBFpT7jGe7xwGG_CSaI9DQaCYHJd1y97QeQrzt9j_sO3Hei_NIzkLOW_aMIy1O5mmJa' target='blank' rel='noopener noreferer'>INFORME ", "Designación_Oficial": "MZ 8 LT 1 - ESPACIO VERDE", "Estado_del_inm.": "EDIFICADO No PH", "Nomenclatura_Cat.": "1101010410008001", "Nro._de_Cuenta": "110142138140", "Rentas_Córdoba": "<a href='https:\/\/www.rentascordoba.gob.ar\/emision\/ver-y-pagar\/inmobiliario\/110142138140' target='blank' rel='noopener noreferer'>CONSULTE SU CUENTA<\/a>", "SRID": "EPSG:22174", "Sup._del_terreno": "330.746,76 m2", "Sup._edificada": "5.012,00 m2", "Tipo_de_inmueble": "URBANO", "Tipo_de_valuación": "VAL. URBANO" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -64.173243493650972, -31.42642564432181 ], [ -64.1742341913628, -31.425439452818956 ], [ -64.174263921816717, -31.425411584828112 ], [ -64.174316913492177, -31.425376830218774 ], [ -64.174415633278585, -31.425365825108461 ], [ -64.17449865162267, -31.425377599396796 ], [ -64.174630294727862, -31.425417695775444 ], [ -64.174701175266122, -31.425442837877537 ], [ -64.174791240751247, -31.425463114607201 ], [ -64.174890738205107, -31.425472302649435 ], [ -64.176174981525008, -31.42532452698255 ], [ -64.176301787253877, -31.425297210312131 ], [ -64.176854675704377, -31.425122502153044 ], [ -64.176908204706692, -31.425105597478311 ], [ -64.177095254670661, -31.425169621562148 ], [ -64.177239751027528, -31.425236741783579 ], [ -64.177300502310217, -31.425284430679859 ], [ -64.177318137930115, -31.425332335346543 ], [ -64.177275141284113, -31.425400997748664 ], [ -64.177245455316736, -31.4254660207672 ], [ -64.177220817125132, -31.425547861330724 ], [ -64.177206563339396, -31.425627532310987 ], [ -64.177210570108642, -31.425737787390858 ], [ -64.177230696460526, -31.425841942394722 ], [ -64.177398070602564, -31.426325851121586 ], [ -64.177434796121375, -31.426403340210634 ], [ -64.177488289978413, -31.426484552992772 ], [ -64.177568597284491, -31.426573816017463 ], [ -64.177637733262713, -31.42663594687696 ], [ -64.177784349405044, -31.426720993045979 ], [ -64.177915637888361, -31.426774526278148 ], [ -64.178119053692015, -31.426826584570446 ], [ -64.178777817708294, -31.426993764184168 ], [ -64.178978589164956, -31.427153792542569 ], [ -64.179222935010046, -31.427350123367802 ], [ -64.179248368504773, -31.427390741454953 ], [ -64.17928115850782, -31.427481342492761 ], [ -64.179298750459736, -31.427626462773816 ], [ -64.179321288044875, -31.427729783551968 ], [ -64.179347033054015, -31.427803675674028 ], [ -64.179385550710819, -31.427881328019673 ], [ -64.179441798479843, -31.427947093565471 ], [ -64.179481281597504, -31.427984245557386 ], [ -64.179556367732971, -31.428034236254671 ], [ -64.179640401545726, -31.428076479111287 ], [ -64.179764432527477, -31.42812971648425 ], [ -64.179816021425552, -31.428167748895799 ], [ -64.179882316268873, -31.428229543923749 ], [ -64.179967533765577, -31.428383059452056 ], [ -64.180021603051387, -31.428467963236638 ], [ -64.180096561347227, -31.428658818049467 ], [ -64.180132434673666, -31.428777166288636 ], [ -64.180154883222755, -31.428864886331105 ], [ -64.180164739774384, -31.42896327357106 ], [ -64.180166037815752, -31.429058493113384 ], [ -64.180156539212376, -31.429089422624461 ], [ -64.180053638346763, -31.429262256041717 ], [ -64.179956105200688, -31.42932628124596 ], [ -64.17986372046542, -31.429373124511866 ], [ -64.179762178022727, -31.429402556855681 ], [ -64.179658250872833, -31.429426329651495 ], [ -64.179550713564822, -31.42943056624776 ], [ -64.179378313006282, -31.429394998590141 ], [ -64.179180576539636, -31.429335044368141 ], [ -64.178970947758714, -31.42934166292746 ], [ -64.178899896019558, -31.429353589379769 ], [ -64.178703994043914, -31.42937297713339 ], [ -64.178301553476459, -31.429393813292791 ], [ -64.178107597132069, -31.429417420768385 ], [ -64.177080536422352, -31.429572413277509 ], [ -64.176883453507358, -31.429581528429971 ], [ -64.176803848517324, -31.429565485880655 ], [ -64.176746951754467, -31.429515055975092 ], [ -64.176618544445745, -31.429305120624473 ], [ -64.17656022007273, -31.429182468443493 ], [ -64.1764732946816, -31.428976029792562 ], [ -64.176446198439407, -31.428894844789312 ], [ -64.176405526085787, -31.428737130238449 ], [ -64.176341147647719, -31.428415954065336 ], [ -64.176303907419154, -31.428322507300084 ], [ -64.176221017401957, -31.42822857778641 ], [ -64.176044113117854, -31.428152104561942 ], [ -64.175886862843129, -31.428125140676833 ], [ -64.175832335370998, -31.428129609073629 ], [ -64.175709579604344, -31.42815310054635 ], [ -64.1755850789406, -31.428196898732086 ], [ -64.175490845695165, -31.42823897621285 ], [ -64.175327694005475, -31.428337508145791 ], [ -64.175260389478211, -31.428388446759243 ], [ -64.175161450783435, -31.428449595443816 ], [ -64.175020638094111, -31.428501027758539 ], [ -64.174787655847851, -31.428532382963567 ], [ -64.174526664258124, -31.42854415459508 ], [ -64.174338171641736, -31.428575732414238 ], [ -64.174300688987032, -31.428589242445145 ], [ -64.174193498250219, -31.428638111167491 ], [ -64.174132588454157, -31.428687457510446 ], [ -64.174062726444646, -31.428752667609309 ], [ -64.174015708053417, -31.42881117529328 ], [ -64.173928672609463, -31.429000542155773 ], [ -64.17390413710794, -31.42916688116064 ], [ -64.173902375311087, -31.42921117638668 ], [ -64.173913060784528, -31.429283764719077 ], [ -64.173962011387175, -31.429405602231171 ], [ -64.174075940467034, -31.429601965428855 ], [ -64.174267751290714, -31.429878597654238 ], [ -64.174330525871127, -31.430004095922438 ], [ -64.174355821356329, -31.430134987848334 ], [ -64.174218324168052, -31.43032607993603 ], [ -64.173880796713675, -31.430711992987234 ], [ -64.173737346920902, -31.430898179131631 ], [ -64.173534139873468, -31.431141997321124 ], [ -64.173421151899419, -31.431257652776097 ], [ -64.17184814614177, -31.431551161443693 ], [ -64.171792232511109, -31.431554288108686 ], [ -64.171697443212551, -31.431509793763428 ], [ -64.171616905744131, -31.431503405947563 ], [ -64.171462564690032, -31.431533134231362 ], [ -64.171387078785671, -31.431620037871422 ], [ -64.171343355879117, -31.431656239651126 ], [ -64.170857044565849, -31.431741938362233 ], [ -64.170485336334295, -31.4317993534866 ], [ -64.17038256604593, -31.431806605048973 ], [ -64.170331053176668, -31.431799951280567 ], [ -64.170246501987037, -31.431758338321462 ], [ -64.170137206065093, -31.431621268780855 ], [ -64.170094079224114, -31.431451490246186 ], [ -64.170080138604959, -31.431379111668232 ], [ -64.170077736180446, -31.431270374765809 ], [ -64.170081203651776, -31.431227777448072 ], [ -64.170091873508127, -31.431180785642322 ], [ -64.170163903738754, -31.430900294703392 ], [ -64.170188916362434, -31.430822600374114 ], [ -64.170269845812086, -31.430691278419211 ], [ -64.170328081466437, -31.430621126384981 ], [ -64.170414190476976, -31.430500398441058 ], [ -64.170494063895504, -31.430402633500474 ], [ -64.170521700187422, -31.430358372462287 ], [ -64.170560304496348, -31.430257287068052 ], [ -64.170573748819436, -31.430171221295996 ], [ -64.170584634823172, -31.430040088160016 ], [ -64.170594657563342, -31.429873341226131 ], [ -64.17060545393015, -31.42979424361361 ], [ -64.170650686729928, -31.42960030088814 ], [ -64.170671979175083, -31.429536438217614 ], [ -64.170884840727595, -31.429053645483616 ], [ -64.170970579423411, -31.428877909850932 ], [ -64.171073064045672, -31.428712572337712 ], [ -64.171463889707795, -31.428222921411859 ], [ -64.173243493650972, -31.42642564432181 ] ] ] } } ] };
+
+        // --- Carga de GeoJSON (Parcelas) desde Google Drive ---
+        const urlParcelas = 'https://drive.google.com/uc?export=download&id=1dbqNgOSq6c40b7fqti8BFMYVDL5w50wi';
         const estiloParcelas = { color: '#ff8c00', weight: 2, opacity: 0.9, fillColor: '#ffd700', fillOpacity: 0.4 };
         const parcelasLayer = L.geoJson(null, {
             style: estiloParcelas,
-            onEachFeature: function(feature, layer) {
+            onEachFeature: (feature, layer) => {
                 let popupContent = '<h4>Datos de la Parcela</h4>';
                 if (feature.properties) {
                     popupContent += '<div style="max-height: 200px; overflow-y: auto;"><table>';
                     for (const key in feature.properties) {
-                        if (feature.properties.hasOwnProperty(key) && feature.properties[key]) {
-                            popupContent += `<tr><td style="padding-right: 10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`;
-                        }
+                        popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`;
                     }
                     popupContent += '</table></div>';
                 }
                 layer.bindPopup(popupContent);
+                makeFeatureSelectable(layer);
             }
         }).addTo(map);
-        parcelasLayer.addData(datosParcelaGeoJSON);
         layersControl.addOverlay(parcelasLayer, "Parcelas");
-        map.fitBounds(parcelasLayer.getBounds());
-        // --- FIN: Carga de Parcela ---
 
+        fetch(urlParcelas)
+            .then(response => response.ok ? response.json() : Promise.reject('Error de red'))
+            .then(data => {
+                parcelasLayer.addData(data);
+                map.fitBounds(parcelasLayer.getBounds());
+            })
+            .catch(error => console.error('FALLO AL CARGAR PARCELAS DESDE GOOGLE DRIVE:', error));
 
-        // 4. FUNCIONALIDAD DE LAS HERRAMIENTAS (MODIFICADAS)
-        document.getElementById('buscador').addEventListener('keyup', function(e) {
-            const textoBusqueda = e.target.value.toLowerCase().trim();
-            // Limpiamos todas las capas de puntos
-            Object.values(pointLayers).forEach(layer => layer.clearLayers());
-
-            const marcadoresFiltrados = todosLosMarcadores.filter(marcador => {
-                return textoBusqueda === "" || Object.values(marcador.datos).some(valor => String(valor).toLowerCase().includes(textoBusqueda));
-            });
-            
-            // Volvemos a añadir los marcadores filtrados a su capa original
-            marcadoresFiltrados.forEach(marcador => {
-                // Buscamos a qué capa pertenece el marcador por el nombre en el popup
-                const nombreCapa = marcador.getPopup().getContent().split('<hr>')[0].replace('<b>','').replace('</b>','');
-                if (pointLayers[nombreCapa]) {
-                    pointLayers[nombreCapa].addLayer(marcador);
+        // 4. FUNCIONALIDAD DE HERRAMIENTAS
+        document.getElementById('buscador').addEventListener('input', function(e) {
+            const texto = e.target.value.toLowerCase().trim();
+            todosLosMarcadores.forEach(marker => {
+                const esVisible = texto === "" || Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto));
+                if (esVisible) {
+                    if (!marker._map) marker.addTo(map); // Añadir si no está en el mapa
+                } else {
+                    if (marker._map) marker.remove(); // Quitar si está en el mapa
                 }
             });
         });
 
-        document.getElementById('descargarKML').addEventListener('click', function() {
-            const geojsonVisible = { type: 'FeatureCollection', features: [] };
-            
-            // Recolectamos los marcadores de las capas que están visibles en el mapa
-            map.eachLayer(function(layer) {
-                if (layer instanceof L.Marker) { // Si la capa es un marcador
-                    const feature = layer.toGeoJSON();
-                    feature.properties = {
-                        'name': layer.datos['Número de Cuenta'] || 'Sin cuenta',
-                        'description': `<b>Número de Cuenta:</b> ${layer.datos['Número de Cuenta'] || ''}<br><b>Nomenclatura Castral:</b> ${layer.datos['Nomenclatura Castral'] || ''}<br><b>Nomenclatura Oficial:</b> ${layer.datos['Nomenclatura Oficial'] || ''}<br><b>Carpeta Interna:</b> ${layer.datos['Carpeta Interna'] || ''}<br><b>Observaciones:</b> ${layer.datos.observaciones || ''}`
-                    };
-                    geojsonVisible.features.push(feature);
-                }
-            });
-
-            if (geojsonVisible.features.length === 0) {
-                alert("No hay puntos visibles para descargar. Asegúrate de que las capas de cuentas estén activas.");
+        document.getElementById('descargarSeleccion').addEventListener('click', function() {
+            if (selectedLayer.getLayers().length === 0) {
+                alert("No hay elementos seleccionados. Haga clic en uno o más elementos en el mapa para seleccionarlos.");
                 return;
             }
+            const geojson = selectedLayer.toGeoJSON();
 
-            const kmlString = tokml(geojsonVisible, { name: 'name', description: 'description', documentName: 'Puntos Visibles Exportados' });
+            // Enriquecer el KML con la información del popup
+            geojson.features.forEach((feature, index) => {
+                const layer = selectedLayer.getLayers()[index];
+                feature.properties.name = layer.datos?.['Número de Cuenta'] || layer.feature?.properties?.name || 'Elemento Seleccionado';
+                feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.';
+            });
+
+            const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' });
             const a = document.createElement('a');
             a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString);
-            a.download = 'puntos_visibles.kml';
+            a.download = 'seleccion.kml';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
