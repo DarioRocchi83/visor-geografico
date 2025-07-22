@@ -8,8 +8,11 @@
     <!-- ESTILOS Y LIBRERÍAS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@2.1.7/dist/leaflet-measure.css">
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@2.1.7/dist/leaflet-measure.js"></script>
+    
+    <!-- ** LIBRERÍA DE MEDICIÓN REEMPLAZADA POR LEAFLET-GEOMAN ** -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/tokml@0.4.0/tokml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -18,6 +21,8 @@
         body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { height: 100vh; width: 100%; }
         .hidden { display: none !important; }
+
+        /* --- ESTILOS PARA EL LOGIN Y REGISTRO --- */
         #auth-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f2f2f2; z-index: 2000; display: flex; justify-content: center; align-items: center; }
         .auth-form-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; width: 320px; }
         .auth-form-box h2 { margin-top: 0; color: #333; }
@@ -26,184 +31,166 @@
         .auth-form-box button:hover { background-color: #0056b3; }
         .auth-error { color: #e63946; margin-top: 10px; font-weight: bold; min-height: 20px;}
         .switch-form-link { color: #007bff; cursor: pointer; text-decoration: underline; margin-top: 15px; display: inline-block; }
+
+        /* --- ESTILOS MEJORADOS PARA PANELES --- */
         #visor-container { display: none; }
-        .info-panel { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); max-width: 270px; }
-        .info-panel input, .info-panel button { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 8px; }
-        .info-panel button { background-color: #007bff; color: white; border: none; cursor: pointer; }
-        .info-panel button:hover { background-color: #0056b3; }
-        #logout-button { background-color: #dc3545; }
+        .custom-panel { z-index: 1000; background: white; border-radius: 5px; box-shadow: 0 1px 5px rgba(0,0,0,0.4); }
+        
+        #tools-panel { position: absolute; top: 10px; left: 50px; width: 270px; }
+        #users-panel { position: absolute; bottom: 10px; right: 10px; width: 270px; }
+
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; }
+        .panel-title { margin: 0; font-size: 1em; font-weight: bold; }
+        .toggle-btn { cursor: pointer; font-size: 1.2em; font-weight: bold; padding: 0 5px; user-select: none; }
+
+        .panel-content { padding: 10px; }
+        .custom-panel.collapsed .panel-content { display: none; }
+        .custom-panel.collapsed .panel-header { border-bottom: none; }
+
+        .panel-content input, .panel-content button { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 8px; }
+        .panel-content button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+        .panel-content button:hover { background-color: #0056b3; }
+        #logout-button { background-color: #dc3545; margin-top: 10px; }
         #logout-button:hover { background-color: #c82333; }
-        .info-panel .help-text { font-size: 0.8em; color: #555; margin-top: 5px; }
-        .leaflet-top.leaflet-right { top: 10px; }
-        #users-panel { position: absolute; bottom: 20px; right: 20px; z-index: 1000; background: rgba(255, 255, 255, 0.9); padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-height: 200px; overflow-y: auto; }
-        #users-panel h4 { margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #ccc; font-size: 1em; }
-        #users-list { list-style: none; padding: 0; margin: 0; }
-        #users-list li { padding: 3px 0; font-size: 0.9em; }
+        .help-text { font-size: 0.8em; color: #555; margin-top: 5px; }
+
+        #users-list { list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; }
+        #users-list li { padding: 3px 0; font-size: 0.9em; word-wrap: break-word; }
         #users-list li::before { content: '●'; color: #28a745; margin-right: 8px; font-size: 0.8em; }
     </style>
 </head>
 <body>
     <div id="auth-container">
+        <!-- ... El contenedor de autenticación no cambia ... -->
         <div class="auth-form-box">
-            <form id="login-form">
-                <h2>Acceso al Visor</h2>
-                <input type="email" id="login-email" placeholder="Correo electrónico" required>
-                <input type="password" id="login-password" placeholder="Contraseña" required>
-                <button type="submit">Ingresar</button>
-                <p id="login-error" class="auth-error"></p>
-                <p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p>
-            </form>
-            <form id="register-form" class="hidden">
-                <h2>Crear una Cuenta</h2>
-                <input type="email" id="register-email" placeholder="Correo electrónico" required>
-                <input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required>
-                <button type="submit">Registrarse</button>
-                <p id="register-error" class="auth-error"></p>
-                <p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p>
-            </form>
+            <form id="login-form"><h2>Acceso al Visor</h2><input type="email" id="login-email" placeholder="Correo electrónico" required><input type="password" id="login-password" placeholder="Contraseña" required><button type="submit">Ingresar</button><p id="login-error" class="auth-error"></p><p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p></form>
+            <form id="register-form" class="hidden"><h2>Crear una Cuenta</h2><input type="email" id="register-email" placeholder="Correo electrónico" required><input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required><button type="submit">Registrarse</button><p id="register-error" class="auth-error"></p><p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p></form>
         </div>
     </div>
     <div id="visor-container">
-        <div class="info-panel">
-            <input type="text" id="buscador" placeholder="Buscar en todos los campos de los puntos...">
-            <button id="descargarSeleccion">Descargar Selección (KML)</button>
-            <p class="help-text">Haga clic en un elemento para seleccionarlo/deseleccionarlo.</p>
-            <button id="logout-button">Cerrar Sesión</button>
+        <!-- ** PANELES CON NUEVA ESTRUCTURA COLAPSABLE ** -->
+        <div id="tools-panel" class="custom-panel">
+            <div class="panel-header">
+                <h4 class="panel-title">Herramientas</h4>
+                <span class="toggle-btn">-</span>
+            </div>
+            <div class="panel-content">
+                <input type="text" id="buscador" placeholder="Buscar en todos los campos...">
+                <button id="descargarSeleccion">Descargar Selección (KML)</button>
+                <p class="help-text">Haga clic en un elemento para seleccionarlo/deseleccionarlo.</p>
+                <button id="logout-button">Cerrar Sesión</button>
+            </div>
         </div>
+        
+        <div id="users-panel" class="custom-panel">
+            <div class="panel-header">
+                <h4 class="panel-title">Usuarios Conectados</h4>
+                <span class="toggle-btn">-</span>
+            </div>
+            <div class="panel-content">
+                <ul id="users-list"></ul>
+            </div>
+        </div>
+        
         <div id="map"></div>
-        <div id="users-panel">
-            <h4>Usuarios Conectados</h4>
-            <ul id="users-list"></ul>
-        </div>
     </div>
 
     <script type="module">
-        // --- v5 - SOLUCIÓN DEFINITIVA PARA DUPLICADOS ---
+        // --- v6 - PANELES COLAPSABLES Y MEJORA DE MEDICIÓN ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY",
-            authDomain: "visor-geografico-presencia.firebaseapp.com",
-            databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com",
-            projectId: "visor-geografico-presencia",
-            storageBucket: "visor-geografico-presencia.appspot.com",
-            messagingSenderId: "761855239344",
-            appId: "1:761855239344:web:1d5b9ce48d5997bb90c775",
-            measurementId: "G-4HB0M8SCH3"
-        };
-
+        // ... El código de configuración de Firebase no cambia ...
+        const firebaseConfig = { apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY", authDomain: "visor-geografico-presencia.firebaseapp.com", databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com", projectId: "visor-geografico-presencia", storageBucket: "visor-geografico-presencia.appspot.com", messagingSenderId: "761855239344", appId: "1:761855239344:web:1d5b9ce48d5997bb90c775", measurementId: "G-4HB0M8SCH3" };
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const auth = getAuth(app);
-        
         let mapInitialized = false;
 
-        // --- LÓGICA DE PRESENCIA (CORREGIDA) ---
+        // --- LÓGICA DE PRESENCIA (YA ESTÁ CORRECTA) ---
         const connectedUsersRef = ref(database, 'connected_users');
-        
-        // 1. SE CREA UN ÚNICO "OYENTE" PARA LA UI, UNA SOLA VEZ.
         onValue(connectedUsersRef, (snapshot) => {
             const usersListElement = document.getElementById('users-list');
-            usersListElement.innerHTML = ''; // Siempre limpiar primero
+            usersListElement.innerHTML = '';
             const users = snapshot.val();
-            if (users) {
+            if (users && Object.keys(users).length > 0) {
                 Object.values(users).forEach(user => {
                     const li = document.createElement('li');
                     li.textContent = user.name;
                     usersListElement.appendChild(li);
                 });
             } else {
-                const li = document.createElement('li');
-                li.textContent = 'Nadie conectado.';
-                li.style.color = '#888';
-                usersListElement.appendChild(li);
+                usersListElement.innerHTML = '<li>Nadie más conectado.</li>';
             }
         });
 
-        // 2. onAuthStateChanged GESTIONA EL ESTADO, PERO NO CREA OYENTES.
+        // --- GESTIÓN DE ESTADO DEL USUARIO ---
         onAuthStateChanged(auth, (user) => {
-            const authContainer = document.getElementById('auth-container');
-            const visorContainer = document.getElementById('visor-container');
-
-            if (user) { // Usuario ha iniciado sesión
-                authContainer.classList.add('hidden');
-                visorContainer.style.display = 'block';
-
+            if (user) {
+                document.getElementById('auth-container').classList.add('hidden');
+                document.getElementById('visor-container').style.display = 'block';
                 if (!mapInitialized) {
                     inicializarMapa();
                     mapInitialized = true;
                 }
-                
-                // Anunciar la presencia del usuario
                 const userRef = ref(database, `connected_users/${user.uid}`);
                 set(userRef, { name: user.email, connected_at: serverTimestamp() });
                 onDisconnect(userRef).remove();
-
-            } else { // Usuario ha cerrado sesión
-                authContainer.classList.remove('hidden');
-                visorContainer.style.display = 'none';
+            } else {
+                document.getElementById('auth-container').classList.remove('hidden');
+                document.getElementById('visor-container').style.display = 'none';
             }
         });
 
         // --- MANEJADORES DE FORMULARIOS Y BOTONES ---
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const errorElement = document.getElementById('login-error');
-            errorElement.textContent = '';
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                errorElement.textContent = "Email o contraseña incorrectos.";
-            }
-        });
+        // ... (No cambian, ya están correctos) ...
+        document.getElementById('login-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const errorElement = document.getElementById('login-error'); errorElement.textContent = ''; try { await signInWithEmailAndPassword(auth, email, password); } catch (error) { errorElement.textContent = "Email o contraseña incorrectos."; } });
+        document.getElementById('register-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; const errorElement = document.getElementById('register-error'); errorElement.textContent = ''; try { await createUserWithEmailAndPassword(auth, email, password); } catch (error) { if (error.code === 'auth/email-already-in-use') errorElement.textContent = 'Este correo ya está registrado.'; else if (error.code === 'auth/weak-password') errorElement.textContent = 'La contraseña es demasiado débil.'; else errorElement.textContent = 'Error al registrar la cuenta.'; } });
+        document.getElementById('logout-button').addEventListener('click', async () => { const user = auth.currentUser; if (user) { const userRef = ref(database, `connected_users/${user.uid}`); await remove(userRef); } await signOut(auth); });
+        document.getElementById('show-register').addEventListener('click', () => { document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden'); });
+        document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); });
 
-        document.getElementById('register-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
-            const errorElement = document.getElementById('register-error');
-            errorElement.textContent = '';
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                if (error.code === 'auth/email-already-in-use') errorElement.textContent = 'Este correo ya está registrado.';
-                else if (error.code === 'auth/weak-password') errorElement.textContent = 'La contraseña es demasiado débil.';
-                else errorElement.textContent = 'Error al registrar la cuenta.';
-            }
+        // --- **NUEVO: LÓGICA PARA PANELES COLAPSABLES** ---
+        document.querySelectorAll('.toggle-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const panel = e.target.closest('.custom-panel');
+                panel.classList.toggle('collapsed');
+                if (panel.classList.contains('collapsed')) {
+                    e.target.textContent = '+';
+                } else {
+                    e.target.textContent = '-';
+                }
+            });
         });
         
-        document.getElementById('logout-button').addEventListener('click', async () => {
-            // Eliminar la presencia ANTES de cerrar sesión
-            const user = auth.currentUser;
-            if (user) {
-                const userRef = ref(database, `connected_users/${user.uid}`);
-                await remove(userRef);
-            }
-            await signOut(auth); // Cerrar sesión
-        });
-        
-        document.getElementById('show-register').addEventListener('click', () => {
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.remove('hidden');
-        });
-        document.getElementById('show-login').addEventListener('click', () => {
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('login-form').classList.remove('hidden');
-        });
-        
-        // --- FUNCIÓN DEL MAPA (SIN CAMBIOS, ESTÁ CORRECTA) ---
+        // --- FUNCIÓN DEL MAPA (CON LAS MEJORAS INTEGRADAS) ---
         function inicializarMapa() {
-            // ... (El código de esta función es largo y correcto, no lo pego de nuevo para no alargar la respuesta)
-            // Simplemente asegúrate de que tu función completa de inicializarMapa está aquí.
             const baseMaps = { "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }), "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }), "Híbrido": L.layerGroup([ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { pane: 'shadowPane' }) ]) };
             const map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [baseMaps.Calles] });
             map.createPane('shadowPane').style.zIndex = 650;
-            const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
-            L.control.measure({ position: 'topright', primaryLengthUnit: 'meters', localization: 'es' }).addTo(map);
+            
+            // ** MEJORA: LEYENDA COLAPSADA POR DEFECTO **
+            const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: true }).addTo(map);
+
+            // ** MEJORA: HERRAMIENTA DE MEDICIÓN CON LEAFLET-GEOMAN **
+            map.pm.addControls({
+                position: 'topleft',
+                drawCircleMarker: false,
+                drawMarker: false,
+                drawRectangle: false,
+                drawPolygon: false,
+                drawCircle: false,
+                drawText: false,
+                editMode: false,
+                dragMode: false,
+                cutPolygon: false,
+                removalMode: true,
+                rotateMode: false,
+            });
+            map.pm.setLang('es'); // Poner los textos en español
+            
+            // El resto de la lógica del mapa sigue igual...
             const selectedLayer = L.featureGroup().addTo(map);
             const selectedStyle = { color: '#ffff00', weight: 5, opacity: 1 };
             const todosLosMarcadores = [];
