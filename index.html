@@ -1,22 +1,118 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- ... tu head sigue igual ... -->
+    <title>Visor Geográfico Dinámico</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- ESTILOS Y LIBRERÍAS (CSS y JavaScript) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@2.1.7/dist/leaflet-measure.css">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@2.1.7/dist/leaflet-measure.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tokml@0.4.0/tokml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Estilos personalizados -->
     <style>
-        /* ... tus estilos siguen igual ... */
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .hidden { display: none !important; }
+
+        /* --- ESTILOS PARA EL LOGIN Y REGISTRO --- */
+        #auth-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f2f2f2; z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .auth-form-box {
+            background: white; padding: 40px; border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;
+            width: 320px;
+        }
+        .auth-form-box h2 { margin-top: 0; color: #333; }
+        .auth-form-box input {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
+        }
+        .auth-form-box button {
+            width: 100%; padding: 12px; background-color: #007bff;
+            color: white; border: none; border-radius: 5px; cursor: pointer;
+        }
+        .auth-form-box button:hover { background-color: #0056b3; }
+        .auth-error { color: #e63946; margin-top: 10px; font-weight: bold; min-height: 20px;}
+        .switch-form-link { color: #007bff; cursor: pointer; text-decoration: underline; margin-top: 15px; display: inline-block; }
+
+        /* --- ESTILOS DEL VISOR --- */
+        #visor-container { display: none; }
+        .info-panel {
+            position: absolute; top: 10px; left: 50px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65); max-width: 270px;
+        }
+        .info-panel input, .info-panel button { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 8px; }
+        .info-panel button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+        .info-panel button:hover { background-color: #0056b3; }
+        #logout-button { background-color: #dc3545; }
+        #logout-button:hover { background-color: #c82333; }
+        .info-panel .help-text { font-size: 0.8em; color: #555; margin-top: 5px; }
+        .leaflet-top.leaflet-right { top: 10px; }
+
+        /* PANEL DE USUARIOS CONECTADOS */
+        #users-panel {
+            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9); padding: 10px 15px; border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-height: 200px; overflow-y: auto;
+        }
+        #users-panel h4 { margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #ccc; font-size: 1em; }
+        #users-list { list-style: none; padding: 0; margin: 0; }
+        #users-list li { padding: 3px 0; font-size: 0.9em; }
+        #users-list li::before { content: '●'; color: #28a745; margin-right: 8px; font-size: 0.8em; }
     </style>
 </head>
 <body>
-    <!-- ... tu body sigue igual ... -->
+
+    <!-- CONTENEDOR DE AUTENTICACIÓN (LOGIN Y REGISTRO) -->
+    <div id="auth-container">
+        <div class="auth-form-box">
+            <form id="login-form">
+                <h2>Acceso al Visor</h2>
+                <input type="email" id="login-email" placeholder="Correo electrónico" required>
+                <input type="password" id="login-password" placeholder="Contraseña" required>
+                <button type="submit">Ingresar</button>
+                <p id="login-error" class="auth-error"></p>
+                <p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p>
+            </form>
+            <form id="register-form" class="hidden">
+                <h2>Crear una Cuenta</h2>
+                <input type="email" id="register-email" placeholder="Correo electrónico" required>
+                <input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required>
+                <button type="submit">Registrarse</button>
+                <p id="register-error" class="auth-error"></p>
+                <p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTENIDO DEL VISOR (MAPA Y PANELES) -->
+    <div id="visor-container">
+        <div class="info-panel">
+            <input type="text" id="buscador" placeholder="Buscar en todos los campos de los puntos...">
+            <button id="descargarSeleccion">Descargar Selección (KML)</button>
+            <p class="help-text">Haga clic en un elemento para seleccionarlo/deseleccionarlo.</p>
+            <button id="logout-button">Cerrar Sesión</button>
+        </div>
+        <div id="map"></div>
+        <div id="users-panel">
+            <h4>Usuarios Conectados</h4>
+            <ul id="users-list"></ul>
+        </div>
+    </div>
 
     <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
     <script type="module">
-        // --- v3 - SOLUCIÓN PARA DUPLICADOS DE USUARIO ---
-        // Si ves esta línea en el código fuente de tu navegador, estás usando la versión correcta.
-
-        // --- CONFIGURACIÓN DE FIREBASE (MODULAR v9+) ---
+        // --- v4 - VERSIÓN CORREGIDA Y COMPLETA ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        // ... el resto del script es exactamente el mismo que te envié antes ...
         import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
@@ -30,7 +126,7 @@
             appId: "1:761855239344:web:1d5b9ce48d5997bb90c775",
             measurementId: "G-4HB0M8SCH3"
         };
-        // ... resto del script ...
+
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const auth = getAuth(app);
@@ -49,7 +145,6 @@
                     mapInitialized = true;
                 }
                 gestionarPresenciaUsuario(user); 
-
             } else {
                 document.getElementById('auth-container').classList.remove('hidden');
                 document.getElementById('visor-container').style.display = 'none';
@@ -91,7 +186,7 @@
                 }
             }
         });
-
+        
         document.getElementById('logout-button').addEventListener('click', async () => {
             try {
                 if (currentUserPresenceRef) {
@@ -99,7 +194,6 @@
                 }
                 await signOut(auth);
             } catch (error) {
-                console.error("Error al cerrar sesión:", error.message);
                 alert("Hubo un problema al cerrar la sesión.");
             }
         });
@@ -112,17 +206,14 @@
             document.getElementById('register-form').classList.add('hidden');
             document.getElementById('login-form').classList.remove('hidden');
         });
-
+        
         function gestionarPresenciaUsuario(user) {
             currentUserPresenceRef = ref(database, `connected_users/${user.uid}`);
-
             set(currentUserPresenceRef, {
                 name: user.email,
                 connected_at: serverTimestamp()
             });
-
             onDisconnect(currentUserPresenceRef).remove();
-
             onValue(connectedUsersRef, (snapshot) => {
                 const usersListElement = document.getElementById('users-list');
                 usersListElement.innerHTML = '';
@@ -139,8 +230,172 @@
             });
         }
 
+        // --- FUNCIÓN DEL MAPA (AHORA COMPLETA Y CORRECTA) ---
         function inicializarMapa() {
-            // El resto de la función inicializarMapa es idéntica
+            const baseMaps = {
+                "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
+                "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }),
+                "Híbrido": L.layerGroup([
+                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { pane: 'shadowPane' })
+                ])
+            };
+            const map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [baseMaps.Calles] });
+            map.createPane('shadowPane').style.zIndex = 650;
+            
+            const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
+            L.control.measure({ position: 'topright', primaryLengthUnit: 'meters', localization: 'es' }).addTo(map);
+
+            const selectedLayer = L.featureGroup().addTo(map);
+            const selectedStyle = { color: '#ffff00', weight: 5, opacity: 1 };
+            const todosLosMarcadores = [];
+            const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#9b2226'];
+
+            function createColoredIcon(color, isSelected = false) {
+                const fillColor = isSelected ? '#ffff00' : color;
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="${fillColor}" stroke="black" stroke-width="1.5" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path><circle cx="16" cy="10" r="4" fill="white"/></svg>`;
+                return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] });
+            }
+
+            function makeFeatureSelectable(layer) {
+                layer.originalStyle = JSON.parse(JSON.stringify(layer.options.style || {}));
+                layer.on('click', function(e) {
+                    if (selectedLayer.hasLayer(layer)) {
+                        selectedLayer.removeLayer(layer);
+                        if (layer.setStyle) layer.setStyle(layer.originalStyle);
+                    } else {
+                        selectedLayer.addLayer(layer);
+                        if (layer.setStyle) layer.setStyle(selectedStyle);
+                    }
+                    L.DomEvent.stopPropagation(e);
+                });
+            }
+
+            function makePointSelectable(marker) {
+                const originalIcon = marker.options.icon;
+                const color = originalIcon.options.html.match(/fill="([^"]+)"/)[1];
+                const selectedIcon = createColoredIcon(color, true);
+                marker.on('click', function(e) {
+                    if (selectedLayer.hasLayer(marker)) {
+                        selectedLayer.removeLayer(marker);
+                        marker.setIcon(originalIcon);
+                    } else {
+                        selectedLayer.addLayer(marker);
+                        marker.setIcon(selectedIcon);
+                    }
+                    L.DomEvent.stopPropagation(e);
+                });
+            }
+            
+            const GITHUB_USER = 'DarioRocchi83';
+            const GITHUB_REPO = 'visor-geografico';
+            const DATA_FOLDER = 'data';
+            const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${DATA_FOLDER}`;
+
+            async function loadDynamicLayers() {
+                try {
+                    const response = await fetch(API_URL);
+                    if (!response.ok) throw new Error(`Error de red al consultar GitHub: ${response.statusText}`);
+                    const files = await response.json();
+                    files.filter(f => f.name.toLowerCase().endsWith('.geojson')).forEach(f => loadGeoJSONLayer(f, layersControl));
+                    files.filter(f => f.name.toLowerCase().endsWith('.xlsx')).forEach((f, i) => loadXLSXLayer(f, i, layersControl));
+                } catch (error) {
+                    console.error("FALLO CRÍTICO al cargar la lista de archivos desde GitHub:", error);
+                    alert("No se pudo cargar la lista de capas. Revise la consola.");
+                }
+            }
+
+            function loadGeoJSONLayer(file, control) {
+                const layerName = file.name.replace(/\.geojson$/i, '');
+                const estilo = { color: '#3388ff', weight: 3, opacity: 1, fillColor: '#3388ff', fillOpacity: 0.2 };
+                const geojsonLayer = L.geoJson(null, {
+                    style: estilo,
+                    onEachFeature: (feature, layer) => {
+                        layer.originalStyle = estilo;
+                        let popupContent = `<h4>${layerName}</h4><hr><table>`;
+                        for (const key in feature.properties) {
+                            popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`;
+                        }
+                        popupContent += '</table>';
+                        layer.bindPopup(popupContent);
+                        makeFeatureSelectable(layer);
+                    }
+                }).addTo(map);
+                control.addOverlay(geojsonLayer, layerName);
+                fetch(file.download_url).then(res => res.json()).then(data => geojsonLayer.addData(data)).catch(err => console.error(err));
+            }
+
+            async function loadXLSXLayer(file, index, control) {
+                try {
+                    const layerName = file.name.replace(/\.xlsx$/i, '');
+                    const layerGroup = L.layerGroup().addTo(map);
+                    control.addOverlay(layerGroup, layerName);
+                    const color = POINT_COLORS[index % POINT_COLORS.length];
+                    const response = await fetch(file.download_url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer);
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(worksheet);
+                    data.forEach(punto => {
+                        const lat = parseFloat(String(punto.Latitud).replace(',', '.'));
+                        const lon = parseFloat(String(punto.Longitud).replace(',', '.'));
+                        if (!isNaN(lat) && !isNaN(lon)) {
+                            const marker = L.marker([lat, lon], { icon: createColoredIcon(color) });
+                            marker.datos = { ...punto, capa: layerName };
+                            let popupContent = `<b>${layerName}</b><hr>`;
+                            const columnas = ['Número de Orden', 'Número de Cuenta', 'Nomenclatura Castral', 'Nomenclatura Oficial', 'Carpeta Interna', 'Observaciones'];
+                            columnas.forEach(col => {
+                                if (punto[col]) popupContent += `<b>${col.replace('_', ' ')}:</b> ${punto[col]}<br>`;
+                            });
+                            marker.bindPopup(popupContent);
+                            layerGroup.addLayer(marker);
+                            todosLosMarcadores.push(marker);
+                            makePointSelectable(marker);
+                        }
+                    });
+                } catch (error) { console.error(`Fallo al procesar ${file.name}:`, error); }
+            }
+            
+            loadDynamicLayers();
+            
+            document.getElementById('buscador').addEventListener('input', function(e) {
+                const texto = e.target.value.toLowerCase().trim();
+                layersControl._layers.forEach(layerInfo => {
+                    if (layerInfo.layer instanceof L.LayerGroup) {
+                        layerInfo.layer.eachLayer(marker => {
+                            if (marker.datos) {
+                                const estaEnElMapa = layerInfo.layer.hasLayer(marker);
+                                const coincideBusqueda = texto === "" || Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto));
+                                if (coincideBusqueda && !estaEnElMapa) {
+                                    layerInfo.layer.addLayer(marker);
+                                } else if (!coincideBusqueda && estaEnElMapa) {
+                                    layerInfo.layer.removeLayer(marker);
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+
+            document.getElementById('descargarSeleccion').addEventListener('click', function() {
+                if (selectedLayer.getLayers().length === 0) {
+                    alert("No hay elementos seleccionados.");
+                    return;
+                }
+                const geojson = selectedLayer.toGeoJSON();
+                geojson.features.forEach((feature, index) => {
+                    const layer = selectedLayer.getLayers()[index];
+                    feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento';
+                    feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.';
+                });
+                const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' });
+                const a = document.createElement('a');
+                a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString);
+                a.download = 'seleccion.kml';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
         }
     </script>
 </body>
