@@ -117,12 +117,11 @@
     <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
     <script type="module">
         // --- CONFIGURACIÓN DE FIREBASE (MODULAR v9+) ---
+        // <-- CAMBIO CLAVE: importamos 'set' y 'remove'
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getDatabase, ref, onValue, push, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
-        // ** NUEVAS IMPORTACIONES PARA AUTENTICACIÓN **
+        import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
-        // Tu configuración personal de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY",
             authDomain: "visor-geografico-presencia.firebaseapp.com",
@@ -134,22 +133,16 @@
             measurementId: "G-4HB0M8SCH3"
         };
 
-        // Inicializar servicios de Firebase
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
-        const auth = getAuth(app); // Servicio de autenticación
+        const auth = getAuth(app);
 
-        // Referencias a la base de datos en tiempo real
         const connectedUsersRef = ref(database, 'connected_users');
-        let currentUserPresenceRef = null; // Referencia para la entrada de presencia del usuario
-        let mapInitialized = false; // Flag para no inicializar el mapa múltiples veces
+        let currentUserPresenceRef = null;
+        let mapInitialized = false;
 
-        // --- LÓGICA DE AUTENTICACIÓN Y ESTADO DEL USUARIO ---
-
-        // Esta función es el corazón del sistema: se ejecuta cada vez que el estado de login cambia.
         onAuthStateChanged(auth, user => {
             if (user) {
-                // Usuario está logueado
                 document.getElementById('auth-container').classList.add('hidden');
                 document.getElementById('visor-container').style.display = 'block';
 
@@ -157,51 +150,41 @@
                     inicializarMapa();
                     mapInitialized = true;
                 }
-                gestionarPresenciaUsuario(user.email); // Usamos el email como identificador único
+                // <-- CAMBIO CLAVE: Pasamos el objeto 'user' completo
+                gestionarPresenciaUsuario(user); 
 
             } else {
-                // Usuario está deslogueado
                 document.getElementById('auth-container').classList.remove('hidden');
                 document.getElementById('visor-container').style.display = 'none';
-                
-                // Limpiar la referencia de presencia si existe
                 if (currentUserPresenceRef) {
-                    onDisconnect(currentUserPresenceRef).cancel(); // Cancelar la desconexión automática
+                    onDisconnect(currentUserPresenceRef).cancel();
                     currentUserPresenceRef = null;
                 }
             }
         });
 
-        // Manejador del formulario de Login
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const errorElement = document.getElementById('login-error');
-            errorElement.textContent = ''; // Limpiar errores previos
-
+            errorElement.textContent = '';
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged se encargará del resto
             } catch (error) {
-                console.error("Error de login:", error.message);
                 errorElement.textContent = "Email o contraseña incorrectos.";
             }
         });
 
-        // Manejador del formulario de Registro
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('register-email').value;
             const password = document.getElementById('register-password').value;
             const errorElement = document.getElementById('register-error');
             errorElement.textContent = '';
-
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged se encargará del resto
             } catch (error) {
-                console.error("Error de registro:", error.message);
                 if (error.code === 'auth/email-already-in-use') {
                     errorElement.textContent = 'Este correo ya está registrado.';
                 } else if (error.code === 'auth/weak-password') {
@@ -212,23 +195,25 @@
             }
         });
 
-        // Manejador del botón de Cerrar Sesión
+        // <-- CAMBIO CLAVE: Lógica de logout más robusta
         document.getElementById('logout-button').addEventListener('click', async () => {
             try {
+                // Primero, eliminamos explícitamente la presencia del usuario.
+                if (currentUserPresenceRef) {
+                    await remove(currentUserPresenceRef);
+                }
+                // Luego, cerramos la sesión.
                 await signOut(auth);
-                // onAuthStateChanged se encargará del resto
             } catch (error) {
                 console.error("Error al cerrar sesión:", error.message);
                 alert("Hubo un problema al cerrar la sesión.");
             }
         });
-
-        // Lógica para cambiar entre formularios
+        
         document.getElementById('show-register').addEventListener('click', () => {
             document.getElementById('login-form').classList.add('hidden');
             document.getElementById('register-form').classList.remove('hidden');
         });
-
         document.getElementById('show-login').addEventListener('click', () => {
             document.getElementById('register-form').classList.add('hidden');
             document.getElementById('login-form').classList.remove('hidden');
@@ -236,13 +221,21 @@
 
         // --- FUNCIONES DE PRESENCIA Y MAPA ---
         
-        function gestionarPresenciaUsuario(username) {
-            currentUserPresenceRef = push(connectedUsersRef, {
-                name: username,
+        // <-- CAMBIO CLAVE: La función ahora usa el UID del usuario
+        function gestionarPresenciaUsuario(user) {
+            // Creamos una referencia usando el UID del usuario como clave. ¡Ya no usamos push()!
+            currentUserPresenceRef = ref(database, `connected_users/${user.uid}`);
+
+            // Usamos 'set()' para escribir los datos en esa ubicación específica.
+            set(currentUserPresenceRef, {
+                name: user.email, // Guardamos el email para mostrarlo
                 connected_at: serverTimestamp()
             });
+
+            // La magia de onDisconnect: si el navegador se cierra, se borrará esta clave.
             onDisconnect(currentUserPresenceRef).remove();
 
+            // El listener para actualizar la UI no cambia.
             onValue(connectedUsersRef, (snapshot) => {
                 const usersListElement = document.getElementById('users-list');
                 usersListElement.innerHTML = '';
@@ -261,9 +254,7 @@
 
         // --- LA FUNCIÓN DEL MAPA PERMANECE IGUAL ---
         function inicializarMapa() {
-            // ... (El código de inicializarMapa es exactamente el mismo que tenías antes)
-            // Para no hacer el bloque gigante, lo omito aquí, pero debes pegar
-            // TU FUNCIÓN inicializarMapa() COMPLETA en este lugar.
+            // ... (Esta función es correcta y no necesita cambios) ...
             const baseMaps = {
                 "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
                 "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }),
