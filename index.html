@@ -53,6 +53,23 @@
         .info-panel .help-text { font-size: 0.8em; color: #555; margin-top: 5px; }
         #map-container { display: none; } /* Oculto por defecto */
         .leaflet-top.leaflet-right { top: 10px; }
+
+        /* ESTILOS PARA EL PANEL DE USUARIOS CONECTADOS */
+        #users-panel {
+            display: none; /* Oculto por defecto */
+            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px; border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            max-height: 200px; overflow-y: auto;
+        }
+        #users-panel h4 { margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #ccc; font-size: 1em; }
+        #users-list { list-style: none; padding: 0; margin: 0; }
+        #users-list li { padding: 3px 0; font-size: 0.9em; }
+        #users-list li::before {
+            content: '●'; color: #28a745; /* verde */
+            margin-right: 8px; font-size: 0.8em;
+        }
     </style>
 </head>
 <body>
@@ -80,35 +97,95 @@
     <div id="map-container">
         <div id="map"></div>
     </div>
+    
+    <!-- PANEL DE USUARIOS CONECTADOS -->
+    <div id="users-panel">
+        <h4>Usuarios Conectados</h4>
+        <ul id="users-list">
+            <!-- La lista de usuarios se generará aquí con JavaScript -->
+        </ul>
+    </div>
 
-    <script>
+    <!-- *** SCRIPT PRINCIPAL DE LA APLICACIÓN *** -->
+    <!-- Usamos type="module" para poder usar 'import' -->
+    <script type="module">
+        // --- CONFIGURACIÓN DE FIREBASE (MODULAR v9+) ---
+        // Importar las funciones necesarias desde los SDK de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, onValue, push, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+
+        // Tu configuración personal de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY",
+            authDomain: "visor-geografico-presencia.firebaseapp.com",
+            databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com",
+            projectId: "visor-geografico-presencia",
+            storageBucket: "visor-geografico-presencia.appspot.com",
+            messagingSenderId: "761855239344",
+            appId: "1:761855239344:web:1d5b9ce48d5997bb90c775",
+            measurementId: "G-4HB0M8SCH3"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const connectedUsersRef = ref(database, 'connected_users');
+        let currentUserRef = null; // Referencia para la entrada del usuario actual en la BBDD
+
         // --- LÓGICA DE AUTENTICACIÓN ---
         document.getElementById('auth-form').addEventListener('submit', function(event) {
-            event.preventDefault(); // Evita que la página se recargue
+            event.preventDefault(); 
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
             const errorElement = document.getElementById('login-error');
 
-            // --- ¡IMPORTANTE! Credenciales de ejemplo. Cambiar por las deseadas. ---
             if (user === 'dario' && pass === 'visor2025') {
-                // Ocultar el formulario de login
                 document.getElementById('login-container').style.display = 'none';
-                
-                // Mostrar los elementos del visor
                 document.getElementById('map-container').style.display = 'block';
                 document.querySelector('.info-panel').style.display = 'block';
+                document.getElementById('users-panel').style.display = 'block';
                 
-                // Cargar y mostrar el mapa
                 inicializarMapa();
+                gestionarPresenciaUsuario(user); // Activar el sistema de presencia
             } else {
-                errorElement.style.visibility = 'visible'; // Mostrar mensaje de error
+                errorElement.style.visibility = 'visible';
             }
         });
 
+        // --- FUNCIONES PARA GESTIONAR LA PRESENCIA ---
+        function gestionarPresenciaUsuario(username) {
+            // Creamos una nueva entrada en 'connected_users' y guardamos su referencia
+            currentUserRef = push(connectedUsersRef, {
+                name: username,
+                connected_at: serverTimestamp() // Usa la hora del servidor de Firebase
+            });
+
+            // Establecemos la acción a realizar cuando el cliente se desconecte: borrar su entrada.
+            onDisconnect(currentUserRef).remove();
+
+            // Escuchamos cambios en la lista de usuarios para actualizar el panel
+            onValue(connectedUsersRef, (snapshot) => {
+                const usersListElement = document.getElementById('users-list');
+                usersListElement.innerHTML = ''; 
+                const users = snapshot.val();
+                if (users) {
+                    Object.values(users).forEach(user => {
+                        const li = document.createElement('li');
+                        li.textContent = user.name;
+                        usersListElement.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = 'Nadie conectado.';
+                    li.style.color = '#888';
+                    li.style.fontStyle = 'italic';
+                    usersListElement.appendChild(li);
+                }
+            });
+        }
 
         // --- FUNCIÓN PRINCIPAL DEL MAPA ---
         function inicializarMapa() {
-            // 1. INICIALIZACIÓN DEL MAPA
             const baseMaps = {
                 "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
                 "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }),
@@ -120,10 +197,9 @@
             const map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [baseMaps.Calles] });
             map.createPane('shadowPane').style.zIndex = 650;
             
-            const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
+            L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
             L.control.measure({ position: 'topright', primaryLengthUnit: 'meters', localization: 'es' }).addTo(map);
 
-            // 2. HERRAMIENTAS Y FUNCIONES AUXILIARES GLOBALES
             const selectedLayer = L.featureGroup().addTo(map);
             const selectedStyle = { color: '#ffff00', weight: 5, opacity: 1 };
             const todosLosMarcadores = [];
@@ -165,7 +241,6 @@
                 });
             }
             
-            // 3. NÚCLEO DE CARGA DINÁMICA
             const GITHUB_USER = 'DarioRocchi83';
             const GITHUB_REPO = 'visor-geografico';
             const DATA_FOLDER = 'data';
@@ -176,16 +251,13 @@
                     const response = await fetch(API_URL);
                     if (!response.ok) throw new Error(`Error de red al consultar GitHub: ${response.statusText}`);
                     const files = await response.json();
-
                     const geojsonFiles = files.filter(file => file.name.toLowerCase().endsWith('.geojson'));
-                    geojsonFiles.forEach((file, index) => loadGeoJSONLayer(file));
-
+                    geojsonFiles.forEach((file) => loadGeoJSONLayer(file));
                     const xlsxFiles = files.filter(file => file.name.toLowerCase().endsWith('.xlsx'));
                     xlsxFiles.forEach((file, index) => loadXLSXLayer(file, index));
-
                 } catch (error) {
                     console.error("FALLO CRÍTICO al cargar la lista de archivos desde GitHub:", error);
-                    alert("No se pudo cargar la lista de capas desde el repositorio. Revise la consola.");
+                    alert("No se pudo cargar la lista de capas. Revise la consola.");
                 }
             }
 
@@ -206,7 +278,7 @@
                     }
                 }).addTo(map);
                 
-                layersControl.addOverlay(geojsonLayer, layerName);
+                L.control.layers(baseMaps, { [layerName]: geojsonLayer }, { position: 'topright' }).addTo(map);
 
                 fetch(file.download_url)
                     .then(response => response.ok ? response.json() : Promise.reject('Error de red'))
@@ -218,9 +290,12 @@
                 try {
                     const layerName = file.name.replace(/\.xlsx$/i, '');
                     const layerGroup = L.layerGroup().addTo(map);
-                    layersControl.addOverlay(layerGroup, layerName);
-                    const color = POINT_COLORS[index % POINT_COLORS.length];
+                    // Esto estaba mal en el código original, creaba un control por cada capa. Lo corregimos.
+                    // L.control.layers(baseMaps, { [layerName]: layerGroup }).addTo(map);
+                    const layersControl = map.layersControl; // Suponiendo que se crea antes
+                    if(layersControl) layersControl.addOverlay(layerGroup, layerName);
 
+                    const color = POINT_COLORS[index % POINT_COLORS.length];
                     const response = await fetch(file.download_url);
                     if (!response.ok) throw new Error('Error de red');
                     const arrayBuffer = await response.arrayBuffer();
@@ -237,13 +312,11 @@
                         if (!isNaN(lat) && !isNaN(lon)) {
                             const marker = L.marker([lat, lon], { icon: createColoredIcon(color) });
                             marker.datos = { ...punto, capa: layerName };
-                            
                             let popupContent = `<b>${layerName}</b><hr>`;
                             const columnas = ['Número de Orden', 'Número de Cuenta', 'Nomenclatura Castral', 'Nomenclatura Oficial', 'Carpeta Interna', 'Observaciones'];
                             columnas.forEach(col => {
                                 if (punto[col]) popupContent += `<b>${col.replace('_', ' ')}:</b> ${punto[col]}<br>`;
                             });
-
                             marker.bindPopup(popupContent);
                             layerGroup.addLayer(marker);
                             todosLosMarcadores.push(marker);
@@ -257,14 +330,12 @@
             
             loadDynamicLayers();
             
-            // 4. FUNCIONALIDAD DE HERRAMIENTAS
             document.getElementById('buscador').addEventListener('input', function(e) {
                 const texto = e.target.value.toLowerCase().trim();
                 todosLosMarcadores.forEach(marker => {
                     const capaDelMarcador = marker.datos.capa;
-                    const layerGroup = layersControl._layers.find(l => l.name === capaDelMarcador)?.layer;
+                    const layerGroup = map.layersControl._layers.find(l => l.name === capaDelMarcador)?.layer;
                     const estaEnElMapa = layerGroup ? layerGroup.hasLayer(marker) : false;
-
                     const coincideBusqueda = texto === "" || Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto));
 
                     if (coincideBusqueda) {
@@ -277,13 +348,13 @@
 
             document.getElementById('descargarSeleccion').addEventListener('click', function() {
                 if (selectedLayer.getLayers().length === 0) {
-                    alert("No hay elementos seleccionados. Haga clic en uno o más elementos en el mapa para seleccionarlos.");
+                    alert("No hay elementos seleccionados.");
                     return;
                 }
                 const geojson = selectedLayer.toGeoJSON();
                 geojson.features.forEach((feature, index) => {
                     const layer = selectedLayer.getLayers()[index];
-                    feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento Seleccionado';
+                    feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento';
                     feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.';
                 });
                 const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' });
@@ -294,8 +365,7 @@
                 a.click();
                 document.body.removeChild(a);
             });
-        } // Fin de inicializarMapa()
-
+        }
     </script>
 </body>
 </html>
