@@ -70,14 +70,12 @@
 </head>
 <body>
     <div id="auth-container">
-        <!-- Contenido de autenticación (sin cambios) -->
         <div class="auth-form-box">
             <form id="login-form"><h2>Acceso al Visor</h2><input type="email" id="login-email" placeholder="Correo electrónico" required><input type="password" id="login-password" placeholder="Contraseña" required><button type="submit">Ingresar</button><p id="login-error" class="auth-error"></p><p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p></form>
             <form id="register-form" class="hidden"><h2>Crear una Cuenta</h2><input type="email" id="register-email" placeholder="Correo electrónico" required><input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required><button type="submit">Registrarse</button><p id="register-error" class="auth-error"></p><p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p></form>
         </div>
     </div>
     <div id="visor-container">
-        <!-- Paneles (sin cambios) -->
         <div id="tools-panel" class="custom-panel">
             <div class="panel-header"><h4 class="panel-title">Herramientas</h4><span class="toggle-btn">-</span></div>
             <div class="panel-content">
@@ -99,7 +97,7 @@
         import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
-        // --- Configuración y Lógica de Firebase (sin cambios) ---
+        // --- Configuración y Lógica de Firebase ---
         const firebaseConfig = { apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY", authDomain: "visor-geografico-presencia.firebaseapp.com", databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com", projectId: "visor-geografico-presencia", storageBucket: "visor-geografico-presencia.appspot.com", messagingSenderId: "761855239344", appId: "1:761855239344:web:1d5b9ce48d5997bb90c775", measurementId: "G-4HB0M8SCH3" };
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
@@ -133,6 +131,8 @@
             const todosLosMarcadores = [];
             const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#9b2226', '#1d3557', '#6a040f', '#0077b6', '#fb8500'];
 
+            // --- LÓGICA DE ESTILOS MEJORADA ---
+
             function createColoredIcon(color, isSelected = false) {
                 const fillColor = isSelected ? '#ffff00' : color;
                 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="leaflet-marker-icon"><path fill-opacity="0.9" stroke="#000" stroke-width="1.5" fill="${fillColor}" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path><circle cx="16" cy="10" r="4" fill="#fff"/></svg>`;
@@ -157,24 +157,20 @@
             }
 
             function makePointSelectable(marker) {
+                marker.originalIcon = marker.getIcon();
                 marker.on('click', function(e) {
                     L.DomEvent.stopPropagation(e);
-                    
                     if (selectedLayer.hasLayer(marker)) {
                         selectedLayer.removeLayer(marker);
-                        marker.setIcon(createColoredIcon(marker.options.color));
+                        marker.setIcon(marker.originalIcon);
                     } else {
                         selectedLayer.addLayer(marker);
                         marker.setIcon(selectedIcon);
                     }
                 });
-                
-                marker.on('dblclick', function(e) {
-                    L.DomEvent.stopPropagation(e);
-                });
             }
 
-            // --- Lógica de medición (sin cambios) ---
+            // --- Lógica de medición ---
             const updateMeasurementLabel = (layer) => {
                 let text = '';
                 if (layer instanceof L.Polygon) {
@@ -226,7 +222,6 @@
                     const layerGroup = L.layerGroup(); 
                     control.addOverlay(layerGroup, layerName); 
                     const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
-                    const customIcon = createColoredIcon(colorDeCapa);
 
                     const response = await fetch(file.download_url); 
                     const arrayBuffer = await response.arrayBuffer(); 
@@ -238,7 +233,9 @@
                         const lat = parseFloat(String(punto.Latitud).replace(',', '.')); 
                         const lon = parseFloat(String(punto.Longitud).replace(',', '.')); 
                         if (!isNaN(lat) && !isNaN(lon)) { 
-                            const marker = L.marker([lat, lon], { icon: customIcon, color: colorDeCapa });
+                            const customIcon = createColoredIcon(colorDeCapa);
+                            const marker = L.marker([lat, lon], { icon: customIcon });
+
                             marker.datos = { ...punto, capa: layerName }; 
                             let popupContent = `<b>${layerName}</b><hr>`; 
                             const columnas = ['Número de Orden', 'Número de Cuenta', 'Nomenclatura Castral', 'Nomenclatura Oficial', 'Carpeta Interna', 'Observaciones']; 
@@ -257,7 +254,7 @@
             
             loadDynamicLayers();
             
-            // --- Lógica del buscador y descarga KML (sin cambios) ---
+            // --- Lógica del buscador y descarga KML ---
             document.getElementById('buscador').addEventListener('input', function(e) { const texto = e.target.value.toLowerCase().trim(); layersControl._layers.forEach(layerInfo => { if (layerInfo.overlay && layerInfo.layer instanceof L.LayerGroup) { const estaCapaVisible = map.hasLayer(layerInfo.layer); if (texto === "" && estaCapaVisible) { layerInfo.layer.eachLayer(marker => { if (!layerInfo.layer.hasLayer(marker)) layerInfo.layer.addLayer(marker); }); } else if (texto !== "") { layerInfo.layer.eachLayer(marker => { if (marker.datos) { const coincideBusqueda = Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto)); if (coincideBusqueda && !layerInfo.layer.hasLayer(marker)) { layerInfo.layer.addLayer(marker); } else if (!coincideBusqueda && layerInfo.layer.hasLayer(marker)) { layerInfo.layer.removeLayer(marker); } } }); } } }); });
             document.getElementById('descargarSeleccion').addEventListener('click', function() { if (selectedLayer.getLayers().length === 0) { alert("No hay elementos seleccionados."); return; } const geojson = selectedLayer.toGeoJSON(); geojson.features.forEach((feature, index) => { const layer = selectedLayer.getLayers()[index]; feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento'; feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.'; }); const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString); a.download = 'seleccion.kml'; document.body.appendChild(a); a.click(); document.body.removeChild(a); });
         }
