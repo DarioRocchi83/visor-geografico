@@ -115,7 +115,7 @@
         document.getElementById('register-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; const errorElement = document.getElementById('register-error'); errorElement.textContent = ''; try { await createUserWithEmailAndPassword(auth, email, password); } catch (error) { if (error.code === 'auth/email-already-in-use') errorElement.textContent = 'Este correo ya está registrado.'; else if (error.code === 'auth/weak-password') errorElement.textContent = 'La contraseña es demasiado débil.'; else errorElement.textContent = 'Error al registrar la cuenta.'; } });
         document.getElementById('logout-button').addEventListener('click', async () => { const user = auth.currentUser; if (user) { const userRef = ref(database, `connected_users/${user.uid}`); await remove(userRef); } await signOut(auth); });
         document.getElementById('show-register').addEventListener('click', () => { document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden'); });
-        document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').remove('hidden'); });
+        document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); });
         document.querySelectorAll('.toggle-btn').forEach(button => { button.addEventListener('click', (e) => { const panel = e.target.closest('.custom-panel'); panel.classList.toggle('collapsed'); e.target.textContent = panel.classList.contains('collapsed') ? '+' : '-'; }); });
 
         // --- FUNCIÓN PRINCIPAL DEL MAPA ---
@@ -131,11 +131,10 @@
             
             const selectedLayer = L.featureGroup().addTo(map);
             const todosLosMarcadores = [];
-            // --- Se confirma el array de colores para diferenciar las capas de puntos ---
             const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#9b2226', '#1d3557', '#6a040f', '#0077b6', '#fb8500'];
 
             function createColoredIcon(color, isSelected = false) {
-                const fillColor = isSelected ? '#ffff00' : color; // El amarillo se usa para la selección
+                const fillColor = isSelected ? '#ffff00' : color;
                 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="leaflet-marker-icon"><path fill-opacity="0.9" stroke="#000" stroke-width="1.5" fill="${fillColor}" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path><circle cx="16" cy="10" r="4" fill="#fff"/></svg>`;
                 return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] });
             }
@@ -146,35 +145,35 @@
                 const selectedStyle = { color: '#ffff00', weight: 5, opacity: 1 };
                 layer.originalStyle = JSON.parse(JSON.stringify(layer.options.style || {})); 
                 layer.on('click', function(e) { 
-                    if (selectedLayer.hasLayer(layer)) { selectedLayer.removeLayer(layer); if (layer.setStyle) layer.setStyle(layer.originalStyle); } 
-                    else { selectedLayer.addLayer(layer); if (layer.setStyle) layer.setStyle(selectedStyle); } 
-                    L.DomEvent.stopPropagation(e); 
+                    L.DomEvent.stopPropagation(e);
+                    if (selectedLayer.hasLayer(layer)) { 
+                        selectedLayer.removeLayer(layer); 
+                        if (layer.setStyle) layer.setStyle(layer.originalStyle); 
+                    } else { 
+                        selectedLayer.addLayer(layer); 
+                        if (layer.setStyle) layer.setStyle(selectedStyle); 
+                    } 
                 }); 
             }
 
-            // --- CORRECCIÓN: Función de selección robusta para marcadores ---
             function makePointSelectable(marker) {
-                marker.originalIcon = marker.options.icon;
                 marker.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    
                     if (selectedLayer.hasLayer(marker)) {
                         selectedLayer.removeLayer(marker);
-                        marker.setIcon(marker.originalIcon);
+                        marker.setIcon(createColoredIcon(marker.options.color));
                     } else {
                         selectedLayer.addLayer(marker);
                         marker.setIcon(selectedIcon);
                     }
-                    // Esto es necesario para que el click no se propague al mapa
-                    L.DomEvent.stopPropagation(e);
                 });
                 
-                // --- CORRECCIÓN: Prevenir que el doble clic en el icono haga zoom en el mapa y cause conflictos ---
-                // Al capturar el evento 'dblclick' y detener su propagación, evitamos que Leaflet
-                // lo interprete como un zoom, lo que solucionaba el problema de la "desaparición" del ícono.
-                marker.on('dblclick', (e) => {
+                marker.on('dblclick', function(e) {
                     L.DomEvent.stopPropagation(e);
                 });
             }
-            
+
             // --- Lógica de medición (sin cambios) ---
             const updateMeasurementLabel = (layer) => {
                 let text = '';
@@ -203,7 +202,6 @@
                     if (!response.ok) throw new Error(`Error de red: ${response.statusText}`); 
                     const files = await response.json(); 
                     files.filter(f => f.name.toLowerCase().endsWith('.geojson')).forEach(f => loadGeoJSONLayer(f, layersControl)); 
-                    // Se pasa el índice 'i' a la función de carga de XLSX para asignar colores diferentes
                     files.filter(f => f.name.toLowerCase().endsWith('.xlsx')).forEach((f, i) => loadXLSXLayer(f, i, layersControl)); 
                 } catch (error) { 
                     console.error("No se pudo obtener la lista de capas:", error);
@@ -227,8 +225,6 @@
                     const layerName = file.name.replace(/\.xlsx$/i, '');
                     const layerGroup = L.layerGroup(); 
                     control.addOverlay(layerGroup, layerName); 
-                    // --- La lógica para asignar un color diferente por capa ya estaba correcta ---
-                    // Se usa el índice del archivo para seleccionar un color del array POINT_COLORS
                     const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
                     const customIcon = createColoredIcon(colorDeCapa);
 
@@ -242,8 +238,7 @@
                         const lat = parseFloat(String(punto.Latitud).replace(',', '.')); 
                         const lon = parseFloat(String(punto.Longitud).replace(',', '.')); 
                         if (!isNaN(lat) && !isNaN(lon)) { 
-                            // Se asigna el icono con el color específico de la capa
-                            const marker = L.marker([lat, lon], { icon: customIcon });
+                            const marker = L.marker([lat, lon], { icon: customIcon, color: colorDeCapa });
                             marker.datos = { ...punto, capa: layerName }; 
                             let popupContent = `<b>${layerName}</b><hr>`; 
                             const columnas = ['Número de Orden', 'Número de Cuenta', 'Nomenclatura Castral', 'Nomenclatura Oficial', 'Carpeta Interna', 'Observaciones']; 
@@ -251,7 +246,7 @@
                             marker.bindPopup(popupContent); 
                             layerGroup.addLayer(marker); 
                             todosLosMarcadores.push(marker); 
-                            makePointSelectable(marker); // Se aplica la lógica de selección mejorada
+                            makePointSelectable(marker); 
                         } 
                     }); 
                 } catch (error) { 
