@@ -127,45 +127,51 @@
             map.pm.addControls({ position: 'topleft', drawPolyline: true, drawPolygon: true, drawCircleMarker: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false, editMode: true, dragMode: false, cutPolygon: false, removalMode: true, rotateMode: false });
             map.pm.setLang('es');
             
-            const selectedLayer = L.featureGroup().addTo(map);
+            let seleccionActual = [];
             const todosLosMarcadores = [];
+            // --- MEJORA: Paleta de colores para las capas ---
             const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#9b2226', '#1d3557', '#6a040f', '#0077b6', '#fb8500'];
 
-            // --- LÓGICA DE ESTILOS MEJORADA ---
-
+            // --- MEJORA: Lógica de estilos para diferenciar selección y capas ---
             function createColoredIcon(color, isSelected = false) {
-                const fillColor = isSelected ? '#ffff00' : color;
+                const fillColor = isSelected ? '#ffff00' : color; // Amarillo para selección, color de capa para el resto
                 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="leaflet-marker-icon"><path fill-opacity="0.9" stroke="#000" stroke-width="1.5" fill="${fillColor}" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path><circle cx="16" cy="10" r="4" fill="#fff"/></svg>`;
                 return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] });
             }
 
+            // --- MEJORA: Icono específico para la selección ---
             const selectedIcon = createColoredIcon(null, true);
 
             function makeFeatureSelectable(layer) { 
                 const selectedStyle = { color: '#ffff00', weight: 5, opacity: 1 };
-                layer.originalStyle = JSON.parse(JSON.stringify(layer.options.style || {})); 
+                layer.originalStyle = JSON.parse(JSON.stringify(layer.options.style || {}));
                 layer.on('click', function(e) { 
                     L.DomEvent.stopPropagation(e);
-                    if (selectedLayer.hasLayer(layer)) { 
-                        selectedLayer.removeLayer(layer); 
+                    const index = seleccionActual.indexOf(layer);
+
+                    if (index > -1) { 
+                        seleccionActual.splice(index, 1);
                         if (layer.setStyle) layer.setStyle(layer.originalStyle); 
                     } else { 
-                        selectedLayer.addLayer(layer); 
-                        if (layer.setStyle) layer.setStyle(selectedStyle); 
+                        seleccionActual.push(layer);
+                        if (layer.setStyle) layer.setStyle(selectedStyle);
                     } 
                 }); 
             }
-
+            
+            // --- MEJORA: La selección de puntos cambia el ícono a amarillo ---
             function makePointSelectable(marker) {
-                marker.originalIcon = marker.getIcon();
+                marker.originalIcon = marker.getIcon(); // Guarda el ícono original (con el color de su capa)
                 marker.on('click', function(e) {
                     L.DomEvent.stopPropagation(e);
-                    if (selectedLayer.hasLayer(marker)) {
-                        selectedLayer.removeLayer(marker);
-                        marker.setIcon(marker.originalIcon);
-                    } else {
-                        selectedLayer.addLayer(marker);
-                        marker.setIcon(selectedIcon);
+                    const index = seleccionActual.indexOf(marker);
+
+                    if (index > -1) { // Si ya está seleccionado, lo deselecciona
+                        seleccionActual.splice(index, 1);
+                        marker.setIcon(marker.originalIcon); // Vuelve al ícono original de su capa
+                    } else { // Si no está seleccionado, lo selecciona
+                        seleccionActual.push(marker);
+                        marker.setIcon(selectedIcon); // Cambia al ícono de selección amarillo
                     }
                 });
             }
@@ -198,6 +204,7 @@
                     if (!response.ok) throw new Error(`Error de red: ${response.statusText}`); 
                     const files = await response.json(); 
                     files.filter(f => f.name.toLowerCase().endsWith('.geojson')).forEach(f => loadGeoJSONLayer(f, layersControl)); 
+                    // Pasa el índice 'i' a la función de carga de XLSX para asignar colores
                     files.filter(f => f.name.toLowerCase().endsWith('.xlsx')).forEach((f, i) => loadXLSXLayer(f, i, layersControl)); 
                 } catch (error) { 
                     console.error("No se pudo obtener la lista de capas:", error);
@@ -216,11 +223,13 @@
                     .catch(error => console.error(`Fallo al cargar la capa GeoJSON '${file.name}':`, error));
             }
             
+            // --- MEJORA: Asigna un color único a cada capa de puntos ---
             async function loadXLSXLayer(file, index, control) { 
                 try { 
                     const layerName = file.name.replace(/\.xlsx$/i, '');
                     const layerGroup = L.layerGroup(); 
                     control.addOverlay(layerGroup, layerName); 
+                    // Asigna un color de la paleta basado en el índice del archivo
                     const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
 
                     const response = await fetch(file.download_url); 
@@ -233,6 +242,7 @@
                         const lat = parseFloat(String(punto.Latitud).replace(',', '.')); 
                         const lon = parseFloat(String(punto.Longitud).replace(',', '.')); 
                         if (!isNaN(lat) && !isNaN(lon)) { 
+                            // Crea el ícono con el color asignado a esta capa
                             const customIcon = createColoredIcon(colorDeCapa);
                             const marker = L.marker([lat, lon], { icon: customIcon });
 
@@ -256,7 +266,29 @@
             
             // --- Lógica del buscador y descarga KML ---
             document.getElementById('buscador').addEventListener('input', function(e) { const texto = e.target.value.toLowerCase().trim(); layersControl._layers.forEach(layerInfo => { if (layerInfo.overlay && layerInfo.layer instanceof L.LayerGroup) { const estaCapaVisible = map.hasLayer(layerInfo.layer); if (texto === "" && estaCapaVisible) { layerInfo.layer.eachLayer(marker => { if (!layerInfo.layer.hasLayer(marker)) layerInfo.layer.addLayer(marker); }); } else if (texto !== "") { layerInfo.layer.eachLayer(marker => { if (marker.datos) { const coincideBusqueda = Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto)); if (coincideBusqueda && !layerInfo.layer.hasLayer(marker)) { layerInfo.layer.addLayer(marker); } else if (!coincideBusqueda && layerInfo.layer.hasLayer(marker)) { layerInfo.layer.removeLayer(marker); } } }); } } }); });
-            document.getElementById('descargarSeleccion').addEventListener('click', function() { if (selectedLayer.getLayers().length === 0) { alert("No hay elementos seleccionados."); return; } const geojson = selectedLayer.toGeoJSON(); geojson.features.forEach((feature, index) => { const layer = selectedLayer.getLayers()[index]; feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento'; feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.'; }); const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString); a.download = 'seleccion.kml'; document.body.appendChild(a); a.click(); document.body.removeChild(a); });
+            
+            document.getElementById('descargarSeleccion').addEventListener('click', function() {
+                if (seleccionActual.length === 0) {
+                    alert("No hay elementos seleccionados.");
+                    return;
+                }
+                const selectionGroup = L.featureGroup(seleccionActual);
+                const geojson = selectionGroup.toGeoJSON();
+
+                geojson.features.forEach((feature, index) => {
+                    const layer = seleccionActual[index]; 
+                    feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento';
+                    feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.';
+                });
+                
+                const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' });
+                const a = document.createElement('a');
+                a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString);
+                a.download = 'seleccion.kml';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
         }
     </script>
 </body>
