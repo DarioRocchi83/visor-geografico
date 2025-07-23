@@ -62,10 +62,26 @@
 </head>
 <body>
     <div id="auth-container">
-        <!-- ... (sin cambios en esta sección) ... -->
+        <div class="auth-form-box">
+            <form id="login-form"><h2>Acceso al Visor</h2><input type="email" id="login-email" placeholder="Correo electrónico" required><input type="password" id="login-password" placeholder="Contraseña" required><button type="submit">Ingresar</button><p id="login-error" class="auth-error"></p><p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p></form>
+            <form id="register-form" class="hidden"><h2>Crear una Cuenta</h2><input type="email" id="register-email" placeholder="Correo electrónico" required><input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required><button type="submit">Registrarse</button><p id="register-error" class="auth-error"></p><p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p></form>
+        </div>
     </div>
     <div id="visor-container">
-        <!-- ... (sin cambios en esta sección) ... -->
+        <div id="tools-panel" class="custom-panel">
+            <div class="panel-header"><h4 class="panel-title">Herramientas</h4><span class="toggle-btn">-</span></div>
+            <div class="panel-content">
+                <input type="text" id="buscador" placeholder="Buscar en todos los campos...">
+                <button id="descargarSeleccion">Descargar Selección (KML)</button>
+                <p class="help-text">Haga clic en un elemento para seleccionarlo/deseleccionarlo.</p>
+                <button id="logout-button">Cerrar Sesión</button>
+            </div>
+        </div>
+        <div id="users-panel" class="custom-panel">
+            <div class="panel-header"><h4 class="panel-title">Usuarios Conectados</h4><span class="toggle-btn">-</span></div>
+            <div class="panel-content"><ul id="users-list"></ul></div>
+        </div>
+        <div id="map"></div>
     </div>
 
     <script type="module">
@@ -73,7 +89,6 @@
         import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
-        // --- Configuración y Lógica de Firebase (sin cambios) ---
         const firebaseConfig = { apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY", authDomain: "visor-geografico-presencia.firebaseapp.com", databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com", projectId: "visor-geografico-presencia", storageBucket: "visor-geografico-presencia.appspot.com", messagingSenderId: "761855239344", appId: "1:761855239344:web:1d5b9ce48d5997bb90c775", measurementId: "G-4HB0M8SCH3" };
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
@@ -92,14 +107,11 @@
         document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); });
         document.querySelectorAll('.toggle-btn').forEach(button => { button.addEventListener('click', (e) => { const panel = e.target.closest('.custom-panel'); panel.classList.toggle('collapsed'); e.target.textContent = panel.classList.contains('collapsed') ? '+' : '-'; }); });
 
-        // --- FUNCIÓN PRINCIPAL DEL MAPA ---
         function inicializarMapa() {
             const baseMaps = { "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }), "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }), "Híbrido": L.layerGroup([ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { pane: 'shadowPane' }) ]) };
             const map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [baseMaps.Calles] });
             map.createPane('shadowPane').style.zIndex = 650;
-            
             const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: true }).addTo(map);
-
             map.pm.addControls({ position: 'topleft', drawPolyline: true, drawPolygon: true, drawCircleMarker: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false, editMode: true, dragMode: false, cutPolygon: false, removalMode: true, rotateMode: false });
             map.pm.setLang('es');
             
@@ -148,13 +160,11 @@
             const DATA_FOLDER = 'data'; 
             const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${DATA_FOLDER}`;
             
-            // --- CAMBIO CLAVE: Carga unificada de capas para asignar índice de color a todas ---
             async function loadDynamicLayers() { 
                 try { 
                     const response = await fetch(API_URL); 
                     if (!response.ok) throw new Error(`Error de red: ${response.statusText}`); 
                     const files = await response.json(); 
-                    
                     const dataFiles = files.filter(f => f.name.toLowerCase().endsWith('.geojson') || f.name.toLowerCase().endsWith('.xlsx'));
 
                     dataFiles.forEach((file, index) => {
@@ -164,37 +174,28 @@
                             loadXLSXLayer(file, index, layersControl);
                         }
                     });
-
                 } catch (error) { 
                     console.error("No se pudo obtener la lista de capas:", error);
                     alert("No se pudo obtener la lista de capas desde GitHub. Revise la consola."); 
                 } 
             }
 
-            // --- CAMBIO CLAVE: La función ahora recibe un índice para el color ---
             function loadGeoJSONLayer(file, index, control) { 
                 const layerName = file.name.replace(/\.geojson$/i, ''); 
                 const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
                 const estiloParaPoligonos = { color: '#3388ff', weight: 3, opacity: 1, fillColor: '#3388ff', fillOpacity: 0.2 }; 
 
                 const geojsonLayer = L.geoJson(null, { 
-                    style: estiloParaPoligonos, // Estilo para líneas y polígonos
-                    
-                    // --- CAMBIO CLAVE: Define cómo crear los puntos ---
+                    style: estiloParaPoligonos,
                     pointToLayer: function (feature, latlng) {
                         const customIcon = createColoredIcon(colorDeCapa);
                         return L.marker(latlng, { icon: customIcon });
                     },
-                    
                     onEachFeature: (feature, layer) => {
                         let popupContent = `<h4>${layerName}</h4><hr><table>`; 
-                        for (const key in feature.properties) { 
-                            popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`; 
-                        } 
+                        for (const key in feature.properties) { popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`; } 
                         popupContent += '</table>'; 
                         layer.bindPopup(popupContent); 
-
-                        // Asigna la lógica de selección correcta según el tipo de geometría
                         if (layer instanceof L.Marker) {
                             makePointSelectable(layer);
                         } else {
@@ -216,7 +217,6 @@
                     const layerGroup = L.layerGroup(); 
                     control.addOverlay(layerGroup, layerName); 
                     const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
-
                     const response = await fetch(file.download_url); 
                     const arrayBuffer = await response.arrayBuffer(); 
                     const workbook = XLSX.read(arrayBuffer); 
@@ -229,7 +229,6 @@
                         if (!isNaN(lat) && !isNaN(lon)) { 
                             const customIcon = createColoredIcon(colorDeCapa);
                             const marker = L.marker([lat, lon], { icon: customIcon });
-
                             marker.datos = { ...punto, capa: layerName }; 
                             let popupContent = `<b>${layerName}</b><hr>`; 
                             const columnas = ['Número de Orden', 'Número de Cuenta', 'Nomenclatura Castral', 'Nomenclatura Oficial', 'Carpeta Interna', 'Observaciones']; 
@@ -265,8 +264,30 @@
             };
             map.on('pm:create', (e) => { const layer = e.layer; updateMeasurementLabel(layer); layer.on('pm:edit', (ev) => updateMeasurementLabel(ev.target)); });
             
-            document.getElementById('buscador').addEventListener('input', function(e) { /* ... sin cambios ... */ });
-            document.getElementById('descargarSeleccion').addEventListener('click', function() { /* ... sin cambios ... */ });
+            document.getElementById('buscador').addEventListener('input', function(e) { const texto = e.target.value.toLowerCase().trim(); layersControl._layers.forEach(layerInfo => { if (layerInfo.overlay && layerInfo.layer instanceof L.LayerGroup) { const estaCapaVisible = map.hasLayer(layerInfo.layer); if (texto === "" && estaCapaVisible) { layerInfo.layer.eachLayer(marker => { if (!layerInfo.layer.hasLayer(marker)) layerInfo.layer.addLayer(marker); }); } else if (texto !== "") { layerInfo.layer.eachLayer(marker => { if (marker.datos) { const coincideBusqueda = Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto)); if (coincideBusqueda && !layerInfo.layer.hasLayer(marker)) { layerInfo.layer.addLayer(marker); } else if (!coincideBusqueda && layerInfo.layer.hasLayer(marker)) { layerInfo.layer.removeLayer(marker); } } }); } } }); });
+            
+            document.getElementById('descargarSeleccion').addEventListener('click', function() {
+                if (seleccionActual.length === 0) {
+                    alert("No hay elementos seleccionados.");
+                    return;
+                }
+                const selectionGroup = L.featureGroup(seleccionActual);
+                const geojson = selectionGroup.toGeoJSON();
+
+                geojson.features.forEach((feature, index) => {
+                    const layer = seleccionActual[index]; 
+                    feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento';
+                    feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.';
+                });
+                
+                const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' });
+                const a = document.createElement('a');
+                a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString);
+                a.download = 'seleccion.kml';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
         }
     </script>
 </body>
