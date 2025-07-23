@@ -70,12 +70,14 @@
 </head>
 <body>
     <div id="auth-container">
+        <!-- Contenido de autenticación (sin cambios) -->
         <div class="auth-form-box">
             <form id="login-form"><h2>Acceso al Visor</h2><input type="email" id="login-email" placeholder="Correo electrónico" required><input type="password" id="login-password" placeholder="Contraseña" required><button type="submit">Ingresar</button><p id="login-error" class="auth-error"></p><p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p></form>
             <form id="register-form" class="hidden"><h2>Crear una Cuenta</h2><input type="email" id="register-email" placeholder="Correo electrónico" required><input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required><button type="submit">Registrarse</button><p id="register-error" class="auth-error"></p><p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p></form>
         </div>
     </div>
     <div id="visor-container">
+        <!-- Paneles (sin cambios) -->
         <div id="tools-panel" class="custom-panel">
             <div class="panel-header"><h4 class="panel-title">Herramientas</h4><span class="toggle-btn">-</span></div>
             <div class="panel-content">
@@ -97,29 +99,26 @@
         import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
+        // --- Configuración y Lógica de Firebase (sin cambios) ---
         const firebaseConfig = { apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY", authDomain: "visor-geografico-presencia.firebaseapp.com", databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com", projectId: "visor-geografico-presencia", storageBucket: "visor-geografico-presencia.appspot.com", messagingSenderId: "761855239344", appId: "1:761855239344:web:1d5b9ce48d5997bb90c775", measurementId: "G-4HB0M8SCH3" };
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const auth = getAuth(app);
         let mapInitialized = false;
-
         const GITHUB_USER = 'DarioRocchi83';
         const GITHUB_REPO = 'visor-geografico';
         
-        // --- LÓGICA DE PRESENCIA ---
+        onAuthStateChanged(auth, (user) => { if (user) { document.getElementById('auth-container').classList.add('hidden'); document.getElementById('visor-container').style.display = 'block'; if (!mapInitialized) { inicializarMapa(); mapInitialized = true; } const userRef = ref(database, `connected_users/${user.uid}`); set(userRef, { name: user.email, connected_at: serverTimestamp() }); onDisconnect(userRef).remove(); } else { document.getElementById('auth-container').classList.remove('hidden'); document.getElementById('visor-container').style.display = 'none'; } });
         const connectedUsersRef = ref(database, 'connected_users');
-        onValue(connectedUsersRef, (snapshot) => { /* ... (código sin cambios) ... */ });
+        onValue(connectedUsersRef, (snapshot) => { const usersListElement = document.getElementById('users-list'); usersListElement.innerHTML = ''; const users = snapshot.val(); if (users && Object.keys(users).length > 0) { Object.values(users).forEach(user => { const li = document.createElement('li'); li.textContent = user.name; usersListElement.appendChild(li); }); } else { usersListElement.innerHTML = '<li>Nadie más conectado.</li>'; } });
+        document.getElementById('login-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const errorElement = document.getElementById('login-error'); errorElement.textContent = ''; try { await signInWithEmailAndPassword(auth, email, password); } catch (error) { errorElement.textContent = "Email o contraseña incorrectos."; } });
+        document.getElementById('register-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; const errorElement = document.getElementById('register-error'); errorElement.textContent = ''; try { await createUserWithEmailAndPassword(auth, email, password); } catch (error) { if (error.code === 'auth/email-already-in-use') errorElement.textContent = 'Este correo ya está registrado.'; else if (error.code === 'auth/weak-password') errorElement.textContent = 'La contraseña es demasiado débil.'; else errorElement.textContent = 'Error al registrar la cuenta.'; } });
+        document.getElementById('logout-button').addEventListener('click', async () => { const user = auth.currentUser; if (user) { const userRef = ref(database, `connected_users/${user.uid}`); await remove(userRef); } await signOut(auth); });
+        document.getElementById('show-register').addEventListener('click', () => { document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden'); });
+        document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); });
+        document.querySelectorAll('.toggle-btn').forEach(button => { button.addEventListener('click', (e) => { const panel = e.target.closest('.custom-panel'); panel.classList.toggle('collapsed'); e.target.textContent = panel.classList.contains('collapsed') ? '+' : '-'; }); });
 
-        // --- GESTIÓN DE ESTADO DEL USUARIO ---
-        onAuthStateChanged(auth, (user) => { /* ... (código sin cambios) ... */ });
-
-        // --- MANEJADORES DE FORMULARIOS Y BOTONES ---
-        /* ... (código sin cambios) ... */
-
-        // --- LÓGICA PARA PANELES COLAPSABLES ---
-        /* ... (código sin cambios) ... */
-        
-        // --- FUNCIÓN DEL MAPA (CON LAS MEJORAS INTEGRADAS) ---
+        // --- FUNCIÓN PRINCIPAL DEL MAPA ---
         function inicializarMapa() {
             const baseMaps = { "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }), "Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }), "Híbrido": L.layerGroup([ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { pane: 'shadowPane' }) ]) };
             const map = L.map('map', { center: [-31.41, -64.18], zoom: 13, layers: [baseMaps.Calles] });
@@ -127,13 +126,11 @@
             
             const layersControl = L.control.layers(baseMaps, {}, { position: 'topright', collapsed: true }).addTo(map);
 
-            // --- MEJORA: Se activa el dibujo de polígonos para medir áreas ---
             map.pm.addControls({ position: 'topleft', drawPolyline: true, drawPolygon: true, drawCircleMarker: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false, editMode: true, dragMode: false, cutPolygon: false, removalMode: true, rotateMode: false });
             map.pm.setLang('es');
             
             const selectedLayer = L.featureGroup().addTo(map);
             const todosLosMarcadores = [];
-            
             const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#9b2226', '#1d3557', '#6a040f', '#0077b6', '#fb8500'];
 
             function createColoredIcon(color, isSelected = false) {
@@ -154,22 +151,25 @@
                 }); 
             }
 
-            // --- MEJORA: Función de selección corregida para evitar desaparición de marcadores ---
+            // --- CORRECCIÓN: Función de selección robusta para marcadores ---
             function makePointSelectable(marker) {
-                marker.originalIcon = marker.options.icon; // Guardar el icono original en el propio objeto
+                marker.originalIcon = marker.options.icon;
                 marker.on('click', function(e) {
                     if (selectedLayer.hasLayer(marker)) {
                         selectedLayer.removeLayer(marker);
-                        marker.setIcon(marker.originalIcon); // Restaurar icono original guardado
+                        marker.setIcon(marker.originalIcon);
                     } else {
                         selectedLayer.addLayer(marker);
-                        marker.setIcon(selectedIcon); // Aplicar icono de selección
+                        marker.setIcon(selectedIcon);
                     }
-                    L.DomEvent.stopPropagation(e); // Previene que el clic se propague al mapa
+                });
+                // --- CORRECCIÓN: Prevenir que el doble clic en el icono haga zoom en el mapa y cause conflictos ---
+                marker.on('dblclick', (e) => {
+                    L.DomEvent.stopPropagation(e);
                 });
             }
             
-            // --- MEJORA: LÓGICA COMPLETA PARA MOSTRAR MEDICIÓN (DISTANCIA Y ÁREA) ---
+            // --- Lógica de medición (sin cambios, ya funciona bien) ---
             const updateMeasurementLabel = (layer) => {
                 let text = '';
                 if (layer instanceof L.Polygon) {
@@ -178,30 +178,15 @@
                 } else if (layer instanceof L.Polyline) {
                     const latlngs = layer.getLatLngs();
                     let distance = 0;
-                    if (latlngs.length > 1) {
-                        for (let i = 0; i < latlngs.length - 1; i++) {
-                            distance += latlngs[i].distanceTo(latlngs[i + 1]);
-                        }
-                    }
+                    if (latlngs.length > 1) for (let i = 0; i < latlngs.length - 1; i++) distance += latlngs[i].distanceTo(latlngs[i + 1]);
                     text = distance > 1000 ? `Distancia: ${(distance / 1000).toFixed(2)} km` : `Distancia: ${distance.toFixed(0)} m`;
                 }
-                
                 if (text) {
-                    if (layer.getTooltip()) {
-                        layer.setTooltipContent(text);
-                    } else {
-                        layer.bindTooltip(text, { permanent: true, className: 'leaflet-tooltip-permanent' }).openTooltip();
-                    }
+                    if (layer.getTooltip()) layer.setTooltipContent(text);
+                    else layer.bindTooltip(text, { permanent: true, className: 'leaflet-tooltip-permanent' }).openTooltip();
                 }
             };
-
-            map.on('pm:create', (e) => {
-                const layer = e.layer;
-                updateMeasurementLabel(layer);
-                // Añadir listener para actualizar la etiqueta al editar
-                layer.on('pm:edit', (ev) => updateMeasurementLabel(ev.target));
-            });
-
+            map.on('pm:create', (e) => { const layer = e.layer; updateMeasurementLabel(layer); layer.on('pm:edit', (ev) => updateMeasurementLabel(ev.target)); });
 
             const DATA_FOLDER = 'data'; 
             const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${DATA_FOLDER}`;
@@ -214,13 +199,33 @@
                     files.filter(f => f.name.toLowerCase().endsWith('.geojson')).forEach(f => loadGeoJSONLayer(f, layersControl)); 
                     files.filter(f => f.name.toLowerCase().endsWith('.xlsx')).forEach((f, i) => loadXLSXLayer(f, i, layersControl)); 
                 } catch (error) { 
-                    console.error("No se pudo cargar la lista de capas:", error);
-                    alert("No se pudo cargar la lista de capas. Revise la consola."); 
+                    console.error("No se pudo obtener la lista de capas:", error);
+                    alert("No se pudo obtener la lista de capas desde GitHub. Revise la consola."); 
                 } 
             }
 
+            // --- CORRECCIÓN: Carga de GeoJSON con manejo de errores robusto ---
             function loadGeoJSONLayer(file, control) { 
-                /* ... (código sin cambios) ... */
+                const layerName = file.name.replace(/\.geojson$/i, ''); 
+                const estilo = { color: '#3388ff', weight: 3, opacity: 1, fillColor: '#3388ff', fillOpacity: 0.2 }; 
+                const geojsonLayer = L.geoJson(null, { style: estilo, onEachFeature: (feature, layer) => { layer.originalStyle = estilo; let popupContent = `<h4>${layerName}</h4><hr><table>`; for (const key in feature.properties) { popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`; } popupContent += '</table>'; layer.bindPopup(popupContent); makeFeatureSelectable(layer); } }); 
+                
+                // Recordatorio: Las capas GeoJSON se añaden al control pero no se activan por defecto.
+                control.addOverlay(geojsonLayer, layerName); 
+
+                fetch(file.download_url)
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Error HTTP ${res.status} al descargar el archivo.`);
+                        return res.json();
+                    })
+                    .then(data => {
+                        geojsonLayer.addData(data);
+                        console.log(`Capa GeoJSON '${layerName}' cargada correctamente.`);
+                    })
+                    .catch(error => {
+                        console.error(`Fallo al cargar o procesar la capa GeoJSON '${file.name}':`, error);
+                        alert(`No se pudo cargar la capa '${file.name}'. El archivo puede estar dañado o no es un GeoJSON válido. Revise la consola (F12) para más detalles.`);
+                    });
             }
             
             async function loadXLSXLayer(file, index, control) { 
@@ -248,33 +253,21 @@
                             marker.bindPopup(popupContent); 
                             layerGroup.addLayer(marker); 
                             todosLosMarcadores.push(marker); 
-                            makePointSelectable(marker); // Aplicar la función de selección corregida
+                            makePointSelectable(marker); 
                         } 
                     }); 
                 } catch (error) { 
-                    console.error(`Fallo al procesar ${file.name}:`, error); 
+                    console.error(`Fallo al procesar el archivo XLSX '${file.name}':`, error);
+                    alert(`No se pudo cargar la capa '${file.name}'. Revise la consola.`);
                 } 
             }
             
             loadDynamicLayers();
             
-            document.getElementById('buscador').addEventListener('input', function(e) { /* ... (código sin cambios) ... */ });
-            document.getElementById('descargarSeleccion').addEventListener('click', function() { /* ... (código sin cambios) ... */ });
+            // --- Lógica del buscador y descarga KML (sin cambios) ---
+            document.getElementById('buscador').addEventListener('input', function(e) { const texto = e.target.value.toLowerCase().trim(); layersControl._layers.forEach(layerInfo => { if (layerInfo.overlay && layerInfo.layer instanceof L.LayerGroup) { const estaCapaVisible = map.hasLayer(layerInfo.layer); if (texto === "" && estaCapaVisible) { layerInfo.layer.eachLayer(marker => { if (!layerInfo.layer.hasLayer(marker)) layerInfo.layer.addLayer(marker); }); } else if (texto !== "") { layerInfo.layer.eachLayer(marker => { if (marker.datos) { const coincideBusqueda = Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto)); if (coincideBusqueda && !layerInfo.layer.hasLayer(marker)) { layerInfo.layer.addLayer(marker); } else if (!coincideBusqueda && layerInfo.layer.hasLayer(marker)) { layerInfo.layer.removeLayer(marker); } } }); } } }); });
+            document.getElementById('descargarSeleccion').addEventListener('click', function() { if (selectedLayer.getLayers().length === 0) { alert("No hay elementos seleccionados."); return; } const geojson = selectedLayer.toGeoJSON(); geojson.features.forEach((feature, index) => { const layer = selectedLayer.getLayers()[index]; feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento'; feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.'; }); const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString); a.download = 'seleccion.kml'; document.body.appendChild(a); a.click(); document.body.removeChild(a); });
         }
-
-        // --- CÓDIGO DE AYUDA RESTANTE (SIN CAMBIOS) ---
-        onValue(connectedUsersRef, (snapshot) => { const usersListElement = document.getElementById('users-list'); usersListElement.innerHTML = ''; const users = snapshot.val(); if (users && Object.keys(users).length > 0) { Object.values(users).forEach(user => { const li = document.createElement('li'); li.textContent = user.name; usersListElement.appendChild(li); }); } else { usersListElement.innerHTML = '<li>Nadie más conectado.</li>'; } });
-        onAuthStateChanged(auth, (user) => { if (user) { document.getElementById('auth-container').classList.add('hidden'); document.getElementById('visor-container').style.display = 'block'; if (!mapInitialized) { inicializarMapa(); mapInitialized = true; } const userRef = ref(database, `connected_users/${user.uid}`); set(userRef, { name: user.email, connected_at: serverTimestamp() }); onDisconnect(userRef).remove(); } else { document.getElementById('auth-container').classList.remove('hidden'); document.getElementById('visor-container').style.display = 'none'; } });
-        document.getElementById('login-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const errorElement = document.getElementById('login-error'); errorElement.textContent = ''; try { await signInWithEmailAndPassword(auth, email, password); } catch (error) { errorElement.textContent = "Email o contraseña incorrectos."; } });
-        document.getElementById('register-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; const errorElement = document.getElementById('register-error'); errorElement.textContent = ''; try { await createUserWithEmailAndPassword(auth, email, password); } catch (error) { if (error.code === 'auth/email-already-in-use') errorElement.textContent = 'Este correo ya está registrado.'; else if (error.code === 'auth/weak-password') errorElement.textContent = 'La contraseña es demasiado débil.'; else errorElement.textContent = 'Error al registrar la cuenta.'; } });
-        document.getElementById('logout-button').addEventListener('click', async () => { const user = auth.currentUser; if (user) { const userRef = ref(database, `connected_users/${user.uid}`); await remove(userRef); } await signOut(auth); });
-        document.getElementById('show-register').addEventListener('click', () => { document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden'); });
-        document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); });
-        document.querySelectorAll('.toggle-btn').forEach(button => { button.addEventListener('click', (e) => { const panel = e.target.closest('.custom-panel'); panel.classList.toggle('collapsed'); e.target.textContent = panel.classList.contains('collapsed') ? '+' : '-'; }); });
-        function loadGeoJSONLayer(file, control) { const layerName = file.name.replace(/\.geojson$/i, ''); const estilo = { color: '#3388ff', weight: 3, opacity: 1, fillColor: '#3388ff', fillOpacity: 0.2 }; const geojsonLayer = L.geoJson(null, { style: estilo, onEachFeature: (feature, layer) => { layer.originalStyle = estilo; let popupContent = `<h4>${layerName}</h4><hr><table>`; for (const key in feature.properties) { popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`; } popupContent += '</table>'; layer.bindPopup(popupContent); makeFeatureSelectable(layer); } }); control.addOverlay(geojsonLayer, layerName); fetch(file.download_url).then(res => res.json()).then(data => geojsonLayer.addData(data)); }
-        document.getElementById('buscador').addEventListener('input', function(e) { const texto = e.target.value.toLowerCase().trim(); layersControl._layers.forEach(layerInfo => { if (layerInfo.overlay && layerInfo.layer instanceof L.LayerGroup) { const estaCapaVisible = map.hasLayer(layerInfo.layer); if (texto === "" && estaCapaVisible) { layerInfo.layer.eachLayer(marker => { if (!layerInfo.layer.hasLayer(marker)) layerInfo.layer.addLayer(marker); }); } else if (texto !== "") { layerInfo.layer.eachLayer(marker => { if (marker.datos) { const coincideBusqueda = Object.values(marker.datos).some(val => String(val).toLowerCase().includes(texto)); if (coincideBusqueda && !layerInfo.layer.hasLayer(marker)) { layerInfo.layer.addLayer(marker); } else if (!coincideBusqueda && layerInfo.layer.hasLayer(marker)) { layerInfo.layer.removeLayer(marker); } } }); } } }); });
-        document.getElementById('descargarSeleccion').addEventListener('click', function() { if (selectedLayer.getLayers().length === 0) { alert("No hay elementos seleccionados."); return; } const geojson = selectedLayer.toGeoJSON(); geojson.features.forEach((feature, index) => { const layer = selectedLayer.getLayers()[index]; feature.properties.name = layer.datos?.['Número de Cuenta'] || feature.properties?.name || 'Elemento'; feature.properties.description = layer.getPopup()?.getContent() || 'Sin descripción.'; }); const kmlString = tokml(geojson, { name: 'name', description: 'description', documentName: 'Seleccion Exportada' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kmlString); a.download = 'seleccion.kml'; document.body.appendChild(a); a.click(); document.body.removeChild(a); });
-
     </script>
 </body>
-</html>```
+</html>
