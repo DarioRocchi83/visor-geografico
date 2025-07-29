@@ -2,52 +2,52 @@
   "layers": [
     {
       "name": "CARPETAS TIERRAS",
-      "file": "CARPETAS TIERRAS.geojson",
+      "file": "CARPETAS_TIERRAS.geojson",
       "type": "geojson"
     },
     {
       "name": "CATASTRO REGISTAL",
-      "file": "CATASTRO REGISTAL.xlsx",
+      "file": "CATASTRO_REGISTAL.xlsx",
       "type": "xlsx"
     },
     {
       "name": "LIMITE PROVINCIAL",
-      "file": "LIMITE PROVINCIAL.geojson",
+      "file": "LIMITE_PROVINCIAL.geojson",
       "type": "geojson"
     },
     {
       "name": "LINDEROS CENTRO",
-      "file": "LINDEROS CENTRO.geojson",
+      "file": "LINDEROS_CENTRO.geojson",
       "type": "geojson"
     },
     {
       "name": "LINDEROS ESTE N",
-      "file": "LINDEROS ESTE N.geojson",
+      "file": "LINDEROS_ESTE_N.geojson",
       "type": "geojson"
     },
     {
       "name": "LINDEROS ESTE S",
-      "file": "LINDEROS ESTE S.geojson",
+      "file": "LINDEROS_ESTE_S.geojson",
       "type": "geojson"
     },
     {
       "name": "LINDEROS NORTE",
-      "file": "LINDEROS NORTE.geojson",
+      "file": "LINDEROS_NORTE.geojson",
       "type": "geojson"
     },
     {
       "name": "LINDEROS OESTE",
-      "file": "LINDEROS OESTE.geojson",
+      "file": "LINDEROS_OESTE.geojson",
       "type": "geojson"
     },
     {
       "name": "LINDEROS SUR",
-      "file": "LINDEROS SUR.geojson",
+      "file": "LINDEROS_SUR.geojson",
       "type": "geojson"
     },
     {
       "name": "PARCELAS INSCRIPTAS",
-      "file": "PARCELAS INSCRIPTAS.geojson",
+      "file": "PARCELAS_INSCRIPTAS.geojson",
       "type": "geojson"
     },
     {
@@ -57,37 +57,37 @@
     },
     {
       "name": "VISADOS 2020",
-      "file": "VISADOS 2020.geojson",
+      "file": "VISADOS_2020.geojson",
       "type": "geojson"
     },
     {
       "name": "VISADOS 2021",
-      "file": "VISADOS 2021.geojson",
+      "file": "VISADOS_2021.geojson",
       "type": "geojson"
     },
     {
       "name": "VISADOS 2022",
-      "file": "VISADOS 2022.geojson",
+      "file": "VISADOS_2022.geojson",
       "type": "geojson"
     },
     {
       "name": "VISADOS 2023",
-      "file": "VISADOS 2023.geojson",
+      "file": "VISADOS_2023.geojson",
       "type": "geojson"
     },
     {
       "name": "VISADOS 2024",
-      "file": "VISADOS 2024.geojson",
+      "file": "VISADOS_2024.geojson",
       "type": "geojson"
     },
     {
       "name": "VISADOS 2025",
-      "file": "VISADOS 2025.geojson",
+      "file": "VISADOS_2025.geojson",
       "type": "geojson"
     },
     {
       "name": "VISADOS PAPEL 2003-2020",
-      "file": "VISADOS PAPEL 2003-2020.geojson",
+      "file": "VISADOS_PAPEL_2003-2020.geojson",
       "type": "geojson"
     }
   ]
