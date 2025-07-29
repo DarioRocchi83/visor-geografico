@@ -12,17 +12,53 @@
     <script src="https://cdn.jsdelivr.net/npm/tokml@0.4.0/tokml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- LIBRERÍA PARA IMPRESIÓN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Estilos personalizados -->
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; }
-        #map { height: 100vh; width: 100%; z-index: 1; }
-        #map.leaflet-crosshair { cursor: crosshair; }
-        .hidden { display: none !important; }
-        #auth-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 2000; display: flex; justify-content: center; align-items: center; }
-        .auth-form-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); text-align: center; width: 350px; animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f8f9fa;
+        }
+        #map { 
+            height: 100vh; 
+            width: 100%; 
+            z-index: 1;
+        }
+        #map.leaflet-crosshair {
+            cursor: crosshair;
+        }
+        .hidden { 
+            display: none !important; 
+        }
+        #auth-container { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 2000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        .auth-form-box { 
+            background: white; 
+            padding: 40px; 
+            border-radius: 15px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            text-align: center; 
+            width: 350px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         .auth-form-box h2 { margin-top: 0; color: #333; font-weight: 600; margin-bottom: 25px; }
         .auth-form-box input { width: 100%; padding: 14px; margin-bottom: 20px; border: 2px solid #e1e5e9; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s; }
         .auth-form-box input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
@@ -65,24 +101,62 @@
         .progress-bar { width: 100%; height: 4px; background: #e9ecef; border-radius: 2px; overflow: hidden; margin: 10px 0; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; transition: width 0.3s; }
         .element-counter { font-size: 13px; color: #666; text-align: center; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; }
-        .leaflet-control-north { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); }
-        .leaflet-control-north img { width: 40px; height: 40px; }
+        
+        /* Estilos para el control del Norte */
+        .leaflet-control-north {
+            background: white;
+            padding: 5px;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+        }
+        .leaflet-control-north img {
+            width: 40px;
+            height: 40px;
+        }
     </style>
 </head>
 <body>
     <div id="auth-container">
         <div class="auth-form-box">
-            <form id="login-form"><h2><i class="fas fa-map-marked-alt"></i> Visor Geográfico</h2><input type="email" id="login-email" placeholder="Correo electrónico" required><input type="password" id="login-password" placeholder="Contraseña" required><button type="submit"><i class="fas fa-sign-in-alt"></i> Ingresar</button><p id="login-error" class="auth-error"></p><p class="switch-form-link" id="show-register">¿No tienes cuenta? <u>Regístrate aquí</u></p></form>
-            <form id="register-form" class="hidden"><h2><i class="fas fa-user-plus"></i> Crear Cuenta</h2><input type="email" id="register-email" placeholder="Correo electrónico" required><input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required><button type="submit"><i class="fas fa-user-check"></i> Registrarse</button><p id="register-error" class="auth-error"></p><p class="switch-form-link" id="show-login">¿Ya tienes cuenta? <u>Ingresa aquí</u></p></form>
+            <form id="login-form">
+                <h2><i class="fas fa-map-marked-alt"></i> Visor Geográfico</h2>
+                <input type="email" id="login-email" placeholder="Correo electrónico" required>
+                <input type="password" id="login-password" placeholder="Contraseña" required>
+                <button type="submit"><i class="fas fa-sign-in-alt"></i> Ingresar</button>
+                <p id="login-error" class="auth-error"></p>
+                <p class="switch-form-link" id="show-register">¿No tienes cuenta? <u>Regístrate aquí</u></p>
+            </form>
+            <form id="register-form" class="hidden">
+                <h2><i class="fas fa-user-plus"></i> Crear Cuenta</h2>
+                <input type="email" id="register-email" placeholder="Correo electrónico" required>
+                <input type="password" id="register-password" placeholder="Contraseña (mín. 6 caracteres)" required>
+                <button type="submit"><i class="fas fa-user-check"></i> Registrarse</button>
+                <p id="register-error" class="auth-error"></p>
+                <p class="switch-form-link" id="show-login">¿Ya tienes cuenta? <u>Ingresa aquí</u></p>
+            </form>
         </div>
     </div>
     <div id="visor-container">
         <div id="tools-panel" class="custom-panel">
-             <div class="panel-header"><h4 class="panel-title"><i class="fas fa-tools"></i> Herramientas GIS</h4><span class="toggle-btn">-</span></div>
+             <div class="panel-header">
+                <h4 class="panel-title"><i class="fas fa-tools"></i> Herramientas GIS</h4>
+                <span class="toggle-btn">-</span>
+            </div>
             <div class="panel-content">
-                <input type="text" id="buscador" placeholder="Buscar y mostrar resultados..."><div class="search-filters"><div class="filter-group"><label class="filter-label">Capa:</label><select id="layer-filter"><option value="">Todas las capas</option></select></div><div class="filter-group"><label class="filter-label">Campo:</label><select id="field-filter"><option value="">Todos los campos</option></select></div></div>
+                <input type="text" id="buscador" placeholder="Buscar y mostrar resultados...">
+                <div class="search-filters">
+                    <div class="filter-group">
+                        <label class="filter-label">Capa:</label>
+                        <select id="layer-filter"><option value="">Todas las capas</option></select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Campo:</label>
+                        <select id="field-filter"><option value="">Todos los campos</option></select>
+                    </div>
+                </div>
                 <div class="element-counter">Elementos seleccionados: <span id="selected-count">0</span></div>
-                <button id="descargarSeleccion"><i class="fas fa-download"></i> Descargar Selección (KML)</button><button id="limpiarSeleccion"><i class="fas fa-broom"></i> Limpiar Selección</button>
+                <button id="descargarSeleccion"><i class="fas fa-download"></i> Descargar Selección (KML)</button>
+                <button id="limpiarSeleccion"><i class="fas fa-broom"></i> Limpiar Selección</button>
                 <div class="gis-tools">
                     <div class="gis-tool-btn" id="measure-distance"><i class="fas fa-ruler"></i>Medir Distancia</div>
                     <div class="gis-tool-btn" id="measure-area"><i class="fas fa-draw-polygon"></i>Medir Área</div>
@@ -91,11 +165,15 @@
                     <div class="gis-tool-btn" id="print-map"><i class="fas fa-print"></i>Imprimir Mapa</div>
                 </div>
                 <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-                <button id="info-button"><i class="fas fa-info-circle"></i> Más Info</button><button id="logout-button"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
+                <button id="info-button"><i class="fas fa-info-circle"></i> Más Info</button>
+                <button id="logout-button"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
             </div>
         </div>
         <div id="users-panel" class="custom-panel">
-            <div class="panel-header"><h4 class="panel-title"><i class="fas fa-users"></i> Usuarios Conectados</h4><span class="toggle-btn">-</span></div>
+            <div class="panel-header">
+                <h4 class="panel-title"><i class="fas fa-users"></i> Usuarios Conectados</h4>
+                <span class="toggle-btn">-</span>
+            </div>
             <div class="panel-content"><ul id="users-list"></ul></div>
         </div>
         <div id="map"></div>
@@ -193,6 +271,7 @@
             map.pm.addControls({ position: 'topleft', drawPolyline: false, drawPolygon: false, drawCircleMarker: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false, editMode: true, dragMode: false, cutPolygon: false, removalMode: true, rotateMode: false });
             map.pm.setLang('es');
             
+            // --- AÑADIR CONTROL DE NORTE ---
             L.Control.North = L.Control.extend({
                 onAdd: function(map) {
                     const container = L.DomUtil.create('div', 'leaflet-control-north');
@@ -234,71 +313,44 @@
             map.on('pm:create', (e) => { const layer = e.layer; drawingsGroup.addLayer(layer); updateMeasurementLabel(layer); layer.on('pm:edit', (ev) => updateMeasurementLabel(ev.target)); });
             document.getElementById('measure-distance').addEventListener('click', () => map.pm.enableDraw('Line'));
             document.getElementById('measure-area').addEventListener('click', () => map.pm.enableDraw('Polygon'));
-
-            // --- LÓGICA DE MARCAR COORDENADA CON ELEVACIÓN ---
-            document.getElementById('mark-coords').addEventListener('click', function() {
-                L.DomUtil.addClass(map._container, 'leaflet-crosshair');
-                map.once('click', async function(e) {
-                    L.DomUtil.removeClass(map._container, 'leaflet-crosshair');
-                    const { lat, lng } = e.latlng;
-                    
-                    // Crear marcador con mensaje de carga
-                    const marker = L.marker(e.latlng).addTo(drawingsGroup);
-                    marker.bindPopup("<b>Cargando elevación...</b>").openPopup();
-
-                    try {
-                        const apiUrl = `https://apis.ign.gob.ar/geodesia/v1.0/altura?lat=${lat}&lon=${lng}`;
-                        const response = await fetch(apiUrl);
-                        if (!response.ok) throw new Error('Error en la respuesta de la API');
-                        const data = await response.json();
-                        
-                        let popupContent;
-                        if (data.status === 'ok' && data.results.length > 0) {
-                            const elevation = data.results[0].altura_ort.toFixed(2);
-                             popupContent = `
-                                <div style="text-align:center; font-size:14px; line-height: 1.6;">
-                                    <b>Coordenadas y Elevación</b><hr style="margin: 4px 0;">
-                                    <b>Latitud:</b> ${lat.toFixed(6)}<br>
-                                    <b>Longitud:</b> ${lng.toFixed(6)}<br>
-                                    <b>Elevación (AR-Geoide16):</b> ${elevation} m
-                                </div>`;
-                        } else {
-                            throw new Error('La API no devolvió un resultado válido.');
-                        }
-                        marker.setPopupContent(popupContent);
-
-                    } catch (error) {
-                        console.error("Error al obtener la elevación:", error);
-                        const errorPopupContent = `
-                            <div style="text-align:center; font-size:14px; line-height: 1.6;">
-                                <b>Coordenadas</b><hr style="margin: 4px 0;">
-                                <b>Latitud:</b> ${lat.toFixed(6)}<br>
-                                <b>Longitud:</b> ${lng.toFixed(6)}<br>
-                                <b>Elevación:</b> No disponible
-                            </div>`;
-                        marker.setPopupContent(errorPopupContent);
-                    }
-                });
-            });
-
+            document.getElementById('mark-coords').addEventListener('click', function() { L.DomUtil.addClass(map._container, 'leaflet-crosshair'); map.once('click', function(e) { L.DomUtil.removeClass(map._container, 'leaflet-crosshair'); const { lat, lng } = e.latlng; const popupContent = `<div style="text-align:center; font-size:14px; line-height: 1.5;"><b>Coordenadas</b><br><hr style="margin: 4px 0;"><b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lng.toFixed(6)}</div>`; const marker = L.marker(e.latlng).bindPopup(popupContent).openPopup(); drawingsGroup.addLayer(marker); }); });
             document.getElementById('clear-drawings').addEventListener('click', function() { drawingsGroup.clearLayers(); });
             
+            // --- LÓGICA DE IMPRESIÓN CON html2canvas ---
             document.getElementById('print-map').addEventListener('click', () => {
+                // Ocultar paneles antes de la captura
                 document.getElementById('tools-panel').style.display = 'none';
                 document.getElementById('users-panel').style.display = 'none';
                 
                 html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => {
+                    // Volver a mostrar paneles después de la captura
                     document.getElementById('tools-panel').style.display = 'block';
                     document.getElementById('users-panel').style.display = 'block';
 
                     const imgData = canvas.toDataURL('image/png');
                     const printWindow = window.open('', '_blank');
                     printWindow.document.write(`
-                        <!DOCTYPE html><html><head><title>Imprimir Mapa</title><style>
-                        @page { margin: 0; size: A4 landscape; } body { margin: 0; } img { width: 100%; height: 100%; object-fit: contain; }
-                        </style></head><body><img src="${imgData}" />
-                        <script> window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; } <\/script>
-                        </body></html>`);
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Imprimir Mapa</title>
+                            <style>
+                                @page { margin: 0; size: A4 landscape; }
+                                body { margin: 0; }
+                                img { width: 100%; height: 100%; object-fit: contain; }
+                            </style>
+                        </head>
+                        <body>
+                            <img src="${imgData}" />
+                            <script>
+                                window.onload = function() {
+                                    window.print();
+                                    window.onafterprint = function() { window.close(); };
+                                }
+                            <\/script>
+                        </body>
+                        </html>
+                    `);
                     printWindow.document.close();
                 });
             });
