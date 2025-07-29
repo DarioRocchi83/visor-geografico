@@ -297,7 +297,7 @@
 
             async function loadDynamicLayers() {
                 const GITHUB_PAGES_URL = 'https://dariorocchi83.github.io/visor-geografico/';
-                const MANIFEST_URL = `${GITHUB_PAGES_URL}data/manifest.json`;
+                const MANIFEST_URL = `${GITHUB_PAGES_URL}data/manifest.json?v=${new Date().getTime()}`;
 
                 try {
                     const response = await fetch(MANIFEST_URL);
