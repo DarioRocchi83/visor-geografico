@@ -198,8 +198,7 @@
         const database = getDatabase(app);
         const auth = getAuth(app);
         let mapInitialized = false;
-        const GITHUB_USER = 'DarioRocchi83';
-        const GITHUB_REPO = 'visor-geografico';
+        // --- SE ELIMINARON LAS CONSTANTES GITHUB_USER Y GITHUB_REPO PORQUE YA NO SE USA LA API DE GITHUB ---
         
         onAuthStateChanged(auth, (user) => { 
             if (user) { 
@@ -271,7 +270,6 @@
             map.pm.addControls({ position: 'topleft', drawPolyline: false, drawPolygon: false, drawCircleMarker: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false, editMode: true, dragMode: false, cutPolygon: false, removalMode: true, rotateMode: false });
             map.pm.setLang('es');
             
-            // --- AÑADIR CONTROL DE NORTE ---
             L.Control.North = L.Control.extend({
                 onAdd: function(map) {
                     const container = L.DomUtil.create('div', 'leaflet-control-north');
@@ -291,13 +289,99 @@
             function makePointSelectable(marker) { marker.originalIcon = marker.getIcon(); marker.on('click', function(e) { L.DomEvent.stopPropagation(e); const index = seleccionActual.indexOf(marker); if (index > -1) { seleccionActual.splice(index, 1); marker.setIcon(marker.originalIcon); } else { seleccionActual.push(marker); marker.setIcon(selectedIcon); } actualizarContadorSeleccion(); }); }
             function actualizarContadorSeleccion() { document.getElementById('selected-count').textContent = seleccionActual.length; }
             
-            const DATA_FOLDER = 'data'; 
-            const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${DATA_FOLDER}`;
+            // ===================================================================================================
+            // --- BLOQUE DE CÓDIGO MODIFICADO ---
+            // Estas 3 funciones han sido reemplazadas para usar GitHub Pages y el archivo manifest.json.
+            // Esto soluciona el error 429 (Too Many Requests).
+            // ===================================================================================================
+
+            async function loadDynamicLayers() {
+                const GITHUB_PAGES_URL = 'https://dariorocchi83.github.io/visor-geografico/';
+                const MANIFEST_URL = `${GITHUB_PAGES_URL}data/manifest.json`;
+
+                try {
+                    const response = await fetch(MANIFEST_URL);
+                    if (!response.ok) throw new Error(`Error de red al cargar el manifiesto: ${response.statusText}`);
+                    const manifest = await response.json();
+                    const dataFiles = manifest.layers;
+
+                    const layerFilterSelect = document.getElementById('layer-filter');
+                    dataFiles.forEach(file => {
+                        const option = document.createElement('option');
+                        option.value = file.name;
+                        option.textContent = file.name;
+                        layerFilterSelect.appendChild(option);
+                    });
+
+                    for (const [index, fileInfo] of dataFiles.entries()) {
+                        const fileUrl = `${GITHUB_PAGES_URL}data/${fileInfo.file}`;
+                        if (fileInfo.type === 'geojson') {
+                            await loadGeoJSONLayer(fileInfo.name, fileUrl, index, layersControl);
+                        } else if (fileInfo.type === 'xlsx') {
+                            await loadXLSXLayer(fileInfo.name, fileUrl, index, layersControl);
+                        }
+                    }
+                } catch (error) {
+                    console.error("No se pudo obtener la lista de capas:", error);
+                    alert("No se pudo obtener la lista de capas desde GitHub. Revise la consola.");
+                }
+            }
+
+            async function loadGeoJSONLayer(layerName, fileUrl, index, control) {
+                const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
+                layerFields[layerName] = new Set();
+                const geojsonLayer = L.geoJson(null, {
+                    style: { color: colorDeCapa, weight: 3, opacity: 1, fillColor: colorDeCapa, fillOpacity: 0.3 },
+                    pointToLayer: (feature, latlng) => L.marker(latlng, { icon: createColoredIcon(colorDeCapa) }),
+                    onEachFeature: (feature, layer) => {
+                        layer.featureData = { ...feature.properties, _layerName: layerName };
+                        Object.keys(feature.properties).forEach(key => layerFields[layerName].add(key));
+                        let popupContent = `<h4>${layerName}</h4><hr><table>`;
+                        for (const key in feature.properties) { popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`; }
+                        popupContent += '</table>';
+                        layer.bindPopup(popupContent);
+                        (layer instanceof L.Marker) ? makePointSelectable(layer) : makeFeatureSelectable(layer);
+                        allFeatures.push(layer);
+                    }
+                });
+                mainLayerGroups[layerName] = geojsonLayer;
+                control.addOverlay(geojsonLayer, layerName);
+                const res = await fetch(fileUrl);
+                if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+                const data = await res.json();
+                geojsonLayer.addData(data);
+            }
+
+            async function loadXLSXLayer(layerName, fileUrl, index, control) {
+                const layerGroup = L.layerGroup();
+                const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length];
+                layerFields[layerName] = new Set();
+                const response = await fetch(fileUrl);
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer);
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const data = XLSX.utils.sheet_to_json(worksheet);
+                data.forEach(punto => {
+                    const lat = parseFloat(String(punto.Latitud).replace(',', '.'));
+                    const lon = parseFloat(String(punto.Longitud).replace(',', '.'));
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        Object.keys(punto).forEach(key => layerFields[layerName].add(key));
+                        const marker = L.marker([lat, lon], { icon: createColoredIcon(colorDeCapa) });
+                        marker.featureData = { ...punto, _layerName: layerName };
+                        let popupContent = `<b>${layerName}</b><hr>`;
+                        for(const key in punto) { if(punto[key]) popupContent += `<b>${key.replace(/_/g, ' ')}:</b> ${punto[key]}<br>`; }
+                        marker.bindPopup(popupContent);
+                        makePointSelectable(marker);
+                        layerGroup.addLayer(marker);
+                        allFeatures.push(marker);
+                    }
+                });
+                mainLayerGroups[layerName] = layerGroup;
+                control.addOverlay(layerGroup, layerName);
+            }
             
-            async function loadDynamicLayers() { try { const response = await fetch(API_URL); if (!response.ok) throw new Error(`Error de red: ${response.statusText}`); const files = await response.json(); const dataFiles = files.filter(f => f.name.toLowerCase().endsWith('.geojson') || f.name.toLowerCase().endsWith('.xlsx')); const layerFilterSelect = document.getElementById('layer-filter'); dataFiles.forEach(file => { const option = document.createElement('option'); const layerName = file.name.replace(/\.(geojson|xlsx)$/i, ''); option.value = layerName; option.textContent = layerName; layerFilterSelect.appendChild(option); }); for (const [index, file] of dataFiles.entries()) { if (file.name.toLowerCase().endsWith('.geojson')) { await loadGeoJSONLayer(file, index, layersControl); } else if (file.name.toLowerCase().endsWith('.xlsx')) { await loadXLSXLayer(file, index, layersControl); } } } catch (error) { console.error("No se pudo obtener la lista de capas:", error); alert("No se pudo obtener la lista de capas desde GitHub. Revise la consola."); } }
-            async function loadGeoJSONLayer(file, index, control) { const layerName = file.name.replace(/\.geojson$/i, ''); const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length]; layerFields[layerName] = new Set(); const geojsonLayer = L.geoJson(null, { style: { color: colorDeCapa, weight: 3, opacity: 1, fillColor: colorDeCapa, fillOpacity: 0.3 }, pointToLayer: (feature, latlng) => L.marker(latlng, { icon: createColoredIcon(colorDeCapa) }), onEachFeature: (feature, layer) => { layer.featureData = { ...feature.properties, _layerName: layerName }; Object.keys(feature.properties).forEach(key => layerFields[layerName].add(key)); let popupContent = `<h4>${layerName}</h4><hr><table>`; for (const key in feature.properties) { popupContent += `<tr><td style="padding-right:10px;"><strong>${key}</strong></td><td>${feature.properties[key]}</td></tr>`; } popupContent += '</table>'; layer.bindPopup(popupContent); (layer instanceof L.Marker) ? makePointSelectable(layer) : makeFeatureSelectable(layer); allFeatures.push(layer); } }); mainLayerGroups[layerName] = geojsonLayer; control.addOverlay(geojsonLayer, layerName); const res = await fetch(file.download_url); if (!res.ok) throw new Error(`Error HTTP ${res.status}`); const data = await res.json(); geojsonLayer.addData(data); }
-            async function loadXLSXLayer(file, index, control) { const layerName = file.name.replace(/\.xlsx$/i, ''); const layerGroup = L.layerGroup(); const colorDeCapa = POINT_COLORS[index % POINT_COLORS.length]; layerFields[layerName] = new Set(); const response = await fetch(file.download_url); const arrayBuffer = await response.arrayBuffer(); const workbook = XLSX.read(arrayBuffer); const worksheet = workbook.Sheets[workbook.SheetNames[0]]; const data = XLSX.utils.sheet_to_json(worksheet); data.forEach(punto => { const lat = parseFloat(String(punto.Latitud).replace(',', '.')); const lon = parseFloat(String(punto.Longitud).replace(',', '.')); if (!isNaN(lat) && !isNaN(lon)) { Object.keys(punto).forEach(key => layerFields[layerName].add(key)); const marker = L.marker([lat, lon], { icon: createColoredIcon(colorDeCapa) }); marker.featureData = { ...punto, _layerName: layerName }; let popupContent = `<b>${layerName}</b><hr>`; for(const key in punto) { if(punto[key]) popupContent += `<b>${key.replace(/_/g, ' ')}:</b> ${punto[key]}<br>`; } marker.bindPopup(popupContent); makePointSelectable(marker); layerGroup.addLayer(marker); allFeatures.push(marker); } }); mainLayerGroups[layerName] = layerGroup; control.addOverlay(layerGroup, layerName); }
-            
+            // --- FIN DEL BLOQUE DE CÓDIGO MODIFICADO ---
+
             const searchResultsLayer = L.featureGroup().addTo(map);
             function applyFilters() { searchResultsLayer.clearLayers(); const buscadorInput = document.getElementById('buscador'); const layerFilterSelect = document.getElementById('layer-filter'); const fieldFilterSelect = document.getElementById('field-filter'); const searchText = buscadorInput.value.toLowerCase().trim(); const selectedLayer = layerFilterSelect.value; const selectedField = fieldFilterSelect.value; if (!searchText) { Object.values(mainLayerGroups).forEach(group => { if (map.hasLayer(group)) { group.addTo(map); } }); return; } Object.values(mainLayerGroups).forEach(group => { if (map.hasLayer(group)) { map.removeLayer(group); } }); let matchingFeatures = []; allFeatures.forEach(feature => { const data = feature.featureData; let isVisible = true; if (selectedLayer && data._layerName !== selectedLayer) isVisible = false; if (isVisible && searchText) { let textMatch = false; if (selectedField && data[selectedField] !== undefined) { textMatch = String(data[selectedField]).toLowerCase().includes(searchText); } else { textMatch = Object.values(data).some(val => String(val).toLowerCase().includes(searchText)); } if (!textMatch) isVisible = false; } if (isVisible) { searchResultsLayer.addLayer(feature); matchingFeatures.push(feature); } }); if (matchingFeatures.length > 0) { map.fitBounds(searchResultsLayer.getBounds().pad(0.1)); } }
             document.getElementById('layer-filter').addEventListener('change', () => { populateFieldFilter(); applyFilters(); });
@@ -306,7 +390,7 @@
             map.on('overlayadd overlayremove', function() { const buscadorInput = document.getElementById('buscador'); if (buscadorInput.value) { buscadorInput.value = ''; searchResultsLayer.clearLayers(); } });
             function populateFieldFilter() { const selectedLayer = document.getElementById('layer-filter').value; const fieldFilterSelect = document.getElementById('field-filter'); fieldFilterSelect.innerHTML = '<option value="">Todos los campos</option>'; if (selectedLayer && layerFields[selectedLayer]) { const sortedFields = Array.from(layerFields[selectedLayer]).sort(); sortedFields.forEach(field => { const option = document.createElement('option'); option.value = field; option.textContent = field; fieldFilterSelect.appendChild(option); }); } }
             
-            loadDynamicLayers();
+            loadDynamicLayers(); // Se llama a la nueva función
             
             const drawingsGroup = L.layerGroup().addTo(map);
             const updateMeasurementLabel = (layer) => { let text = ''; if (layer instanceof L.Polygon) { const area = L.PM.Utils.getArea(layer); text = area > 1000000 ? `Área: ${(area / 1000000).toFixed(2)} km²` : `Área: ${area.toFixed(0)} m²`; } else if (layer instanceof L.Polyline) { const latlngs = layer.getLatLngs(); let distance = 0; if (latlngs.length > 1) for (let i = 0; i < latlngs.length - 1; i++) distance += latlngs[i].distanceTo(latlngs[i + 1]); text = distance > 1000 ? `Distancia: ${(distance / 1000).toFixed(2)} km` : `Distancia: ${distance.toFixed(0)} m`; } if (text) { if (layer.getTooltip()) layer.setTooltipContent(text); else layer.bindTooltip(text, { permanent: true, className: 'leaflet-tooltip-permanent' }).openTooltip(); } };
@@ -316,14 +400,11 @@
             document.getElementById('mark-coords').addEventListener('click', function() { L.DomUtil.addClass(map._container, 'leaflet-crosshair'); map.once('click', function(e) { L.DomUtil.removeClass(map._container, 'leaflet-crosshair'); const { lat, lng } = e.latlng; const popupContent = `<div style="text-align:center; font-size:14px; line-height: 1.5;"><b>Coordenadas</b><br><hr style="margin: 4px 0;"><b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lng.toFixed(6)}</div>`; const marker = L.marker(e.latlng).bindPopup(popupContent).openPopup(); drawingsGroup.addLayer(marker); }); });
             document.getElementById('clear-drawings').addEventListener('click', function() { drawingsGroup.clearLayers(); });
             
-            // --- LÓGICA DE IMPRESIÓN CON html2canvas ---
             document.getElementById('print-map').addEventListener('click', () => {
-                // Ocultar paneles antes de la captura
                 document.getElementById('tools-panel').style.display = 'none';
                 document.getElementById('users-panel').style.display = 'none';
                 
                 html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => {
-                    // Volver a mostrar paneles después de la captura
                     document.getElementById('tools-panel').style.display = 'block';
                     document.getElementById('users-panel').style.display = 'block';
 
