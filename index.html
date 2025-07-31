@@ -301,11 +301,11 @@
                     const arrayBuffer = await response.arrayBuffer();
                     const workbook = XLSX.read(arrayBuffer);
                     
-                    if (!workbook.Sheets['Sheet1']) {
-                        throw new Error('La hoja "Sheet1" no existe en el archivo XLSX');
+                    if (!workbook.Sheets['Hoja1']) {
+                        throw new Error('La hoja "Hoja1" no existe en el archivo XLSX');
                     }
                     
-                    const data = XLSX.utils.sheet_to_json(workbook.Sheets['Sheet1']);
+                    const data = XLSX.utils.sheet_to_json(workbook.Sheets['Hoja1']);
                     
                     if (data.length === 0) {
                         console.warn(`La hoja ${file.name} está vacía`);
