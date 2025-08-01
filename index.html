@@ -43,10 +43,10 @@
         #visor-container { display: none; height: 100vh; width: 100%; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
         #map.leaflet-crosshair { cursor: crosshair; }
+        #map.leaflet-help { cursor: help; }
         .hidden { display: none !important; }
         .custom-panel { z-index: 1000; background: var(--panel-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s ease; }
         #tools-panel { position: absolute; top: 20px; left: 20px; width: 350px; max-height: calc(100vh - 40px); overflow-y: auto; }
-        #users-panel { position: absolute; bottom: 20px; right: 20px; width: 300px; }
         #analysis-panel { position: absolute; top: 20px; right: 20px; width: 350px; max-height: 80vh; overflow-y: auto; }
         .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid #eee; background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; border-radius: var(--border-radius) var(--border-radius) 0 0; cursor: move; user-select: none; }
         .panel-title { margin: 0; font-size: 1.1em; font-weight: 600; }
@@ -60,13 +60,10 @@
         .panel-content button.tool-btn { background: var(--light-color); color: var(--dark-color); border: 1px solid #ddd; }
         .panel-content button.tool-btn:hover { background: #e9ecef; border-color: #adb5bd; }
         #logout-button { background: linear-gradient(135deg, var(--accent-color), #c0392b); margin-top: 10px; }
-        .gis-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
+        .gis-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }
         .gis-tool-btn { background: #f8f9fa; border: 1px solid #dee2e6; color: #495057; padding: 12px 5px; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.3s; font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .gis-tool-btn:hover { background: #e9ecef; border-color: #adb5bd; transform: translateY(-2px); }
         .gis-tool-btn.active-tool { background: var(--secondary-color) !important; color: white !important; border-color: var(--secondary-color) !important; }
-        #users-list { list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; }
-        #users-list li { padding: 8px 0; font-size: 0.95em; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; }
-        #users-list li::before { content: '●'; color: #28a745; margin-right: 10px; font-size: 0.9em; }
         .analysis-section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
         .analysis-section h5 { margin-bottom: 12px; color: var(--primary-color); display: flex; align-items: center; gap: 8px; }
         .chart-container { width: 100%; height: 200px; margin-top: 15px; }
@@ -76,8 +73,47 @@
         .leaflet-tooltip-permanent { background-color: rgba(0, 0, 0, 0.85); color: white; border: none; padding: 8px 12px; font-weight: bold; border-radius: 6px; }
         .element-counter { font-size: 13px; color: #666; text-align: center; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; }
         .leaflet-control-north { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); }
-        .leaflet-control-north img { width: 40px; height: 40px; }
+        .leaflet-control-north img { width: 32px; height: 40px; }
         .layer-load-error { color: #e74c3c; font-size: 12px; padding: 5px; margin-top: 5px; background: #f8d7da; border-radius: 4px; }
+        
+        #users-panel {
+            position: absolute; 
+            bottom: 20px; 
+            right: 20px;
+            width: 280px;
+            max-height: 48px;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out;
+        }
+        #users-panel:hover {
+            max-height: 250px;
+        }
+        #users-panel .panel-header {
+            padding: 12px 20px;
+        }
+        #users-panel .panel-content {
+             padding: 10px 20px;
+        }
+        #users-panel .toggle-btn {
+            display: none;
+        }
+        #users-list { 
+            list-style: none; padding: 0; margin: 0; 
+            max-height: 180px; overflow-y: auto; 
+        }
+        #users-list li { 
+            padding: 8px 0; font-size: 0.95em; 
+            border-bottom: 1px solid #f0f0f0; 
+            display: flex; align-items: center; 
+        }
+        #users-list li:last-child {
+            border-bottom: none;
+        }
+        #users-list li::before { 
+            content: '●'; color: #28a745; 
+            margin-right: 10px; font-size: 0.9em; 
+        }
+
     </style>
 </head>
 <body>
@@ -101,6 +137,7 @@
                 <button id="descargarSeleccion"><i class="fas fa-download"></i> Descargar Selección (KML)</button>
                 <button id="limpiarSeleccion"><i class="fas fa-broom"></i> Limpiar Selección</button>
                 <div class="gis-tools">
+                    <div class="gis-tool-btn" id="info-parcela" title="Información de Parcela"><i class="fas fa-info-circle"></i>Info Parcela</div>
                     <div class="gis-tool-btn" id="measure-distance" title="Medir distancia"><i class="fas fa-ruler"></i>Distancia</div>
                     <div class="gis-tool-btn" id="measure-area" title="Medir área"><i class="fas fa-draw-polygon"></i>Área</div>
                     <div class="gis-tool-btn" id="mark-coords" title="Marcar coordenada"><i class="fas fa-map-marker-alt"></i>Coordenada</div>
@@ -109,7 +146,6 @@
                     <div class="gis-tool-btn" id="clear-drawings" title="Limpiar dibujos"><i class="fas fa-eraser"></i>Limpiar Dibujos</div>
                     <div class="gis-tool-btn" id="print-map" title="Imprimir mapa"><i class="fas fa-print"></i>Imprimir</div>
                 </div>
-                <button id="info-button"><i class="fas fa-info-circle"></i> Más Info</button>
                 <button id="logout-button"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
             </div>
         </div>
@@ -177,7 +213,6 @@
         // --- DEFINICIONES DE PROYECCIONES ---
         proj4.defs("EPSG:4326", "+proj=longlat +ellps=WGS84 +datum=WGS84 +units=degrees");
         
-        // Se definen las 7 fajas de Gauss-Krüger para Argentina (POSGAR 07)
         const fajaDefinitions = {
             1: "+proj=tmerc +lat_0=-90 +lon_0=-72 +k=1 +x_0=1500000 +y_0=0 +ellps=GRS80 +units=m +no_defs",
             2: "+proj=tmerc +lat_0=-90 +lon_0=-69 +k=1 +x_0=2500000 +y_0=0 +ellps=GRS80 +units=m +no_defs",
@@ -204,6 +239,7 @@
             let allFeatures = [], layerFields = {}, mainLayerGroups = {};
             let seleccionActual = [];
             let threeScene, threeRenderer, threeCamera, threeControls;
+            let infoParcelaActivo = false;
             function makePanelDraggable(panelElement) { const header = panelElement.querySelector('.panel-header'); if (!header) return; let isDragging = false, offsetX, offsetY; header.addEventListener('mousedown', (e) => { if (e.target.classList.contains('toggle-btn')) return; isDragging = true; offsetX = e.clientX - panelElement.offsetLeft; offsetY = e.clientY - panelElement.offsetTop; }); document.addEventListener('mousemove', (e) => { if (!isDragging) return; panelElement.style.left = `${e.clientX - offsetX}px`; panelElement.style.top = `${e.clientY - offsetY}px`; }); document.addEventListener('mouseup', () => { isDragging = false; }); }
             
             const baseMaps = { 
@@ -213,33 +249,37 @@
                 "Topográfico": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap' }) 
             };
             
-            // --- CAPA WMS DE CATASTRO (IDECOR) ---
-            const wmsCatastroUrl = 'https://idecor-ws.mapascordoba.gob.ar/geoserver/wms';
+            const wmsCatastroUrl = 'https://idecor-ws.mapascordoba.gob.ar/geoserver/idecor/wms';
             const catastroLayer = L.tileLayer.wms(wmsCatastroUrl, {
-                layers: 'catastro:parcela',
+                layers: 'idecor:parcelas',
                 format: 'image/png',
                 transparent: true,
                 version: '1.1.1',
-                crs: L.CRS.EPSG4326, // <<<---- CAMBIO CLAVE: Especifica el sistema de coordenadas correcto
                 attribution: 'IDECOR | MapasCordoba',
-                zIndex: 500 // Se asegura que esté por encima de los mapas base
+                zIndex: 500 
             });
 
             const overlayMaps = {
                 "Parcelas (IDECOR)": catastroLayer
             };
-            // ------------------------------------
 
-            const map = L.map('map', { center: [-31.41, -64.18], zoom: 12, layers: [baseMaps.Calles] });
+            const map = L.map('map', { 
+                center: [-31.417, -64.183], 
+                zoom: 15, 
+                layers: [baseMaps.Calles, catastroLayer]
+            });
+
             map.createPane('shadowPane').style.zIndex = 650;
             
-            const layersControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
+            const layersControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
 
             L.control.scale({imperial: false}).addTo(map);
             map.pm.addControls({ position: 'topleft', drawPolyline: false, drawPolygon: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false });
             map.pm.setLang('es');
-            L.Control.North = L.Control.extend({ onAdd: function(map) { const c = L.DomUtil.create('div', 'leaflet-control-north'); c.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJMRS40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAtMTguNWM0LjQxIDAgOCAzLjU5IDggOHMtMy41OSA4LTggOC04LTMuNTktOC04IDMuNTktOCA4LTh6bTEuNSA4LjVMMTIgNC45djUuNjRsMS41LTIuNzd6Ii8+PC9zdmc+"></img>'; return c; } });
+
+            L.Control.North = L.Control.extend({ onAdd: function(map) { const c = L.DomUtil.create('div', 'leaflet-control-north'); c.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA1MCI+PHBhdGggZD0iTTIwIDAgTDAgMzUgTDIwIDI4IEw0MCAzNSBaIiBmaWxsPSJibGFjayIvPjx0ZXh0IHg9IjIwIiB5PSI0OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5OPC90ZXh0Pjwvc3ZnPg=="></img>'; return c; } });
             new L.Control.North({ position: 'topright' }).addTo(map);
+
             const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261'];
             function createColoredIcon(color, isSelected = false) { const fillColor = isSelected ? '#ffff00' : color; const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill-opacity="0.9" stroke="#000" stroke-width="1.5" fill="${fillColor}" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path></svg>`; return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 28] }); }
             const selectedIcon = createColoredIcon(null, true);
@@ -309,7 +349,7 @@
                 }); 
                 
                 mainLayerGroups[layerName] = geojsonLayer; 
-                layersControl.addOverlay(geojsonLayer, `[GitHub] ${layerName}`); 
+                layersControl.addOverlay(geojsonLayer, layerName); 
                 
                 try {
                     const response = await fetch(file.download_url);
@@ -336,7 +376,7 @@
                 
                 const group = L.layerGroup(); 
                 mainLayerGroups[layerName] = group; 
-                layersControl.addOverlay(group, `[GitHub] ${layerName}`);
+                layersControl.addOverlay(group, layerName);
                 
                 try {
                     const response = await fetch(file.download_url);
@@ -352,7 +392,16 @@
                     }
                     
                     const data = XLSX.utils.sheet_to_json(workbook.Sheets['Hoja1']);
-                    
+
+                    // --- INICIO DE LA MODIFICACIÓN: Reemplazar nombre de columna ---
+                    data.forEach(row => {
+                        if (row.hasOwnProperty('Nomenclatura Oficial')) {
+                            row['Antecedente Dominial'] = row['Nomenclatura Oficial'];
+                            delete row['Nomenclatura Oficial'];
+                        }
+                    });
+                    // --- FIN DE LA MODIFICACIÓN ---
+
                     if (data.length === 0) {
                         console.warn(`La hoja ${file.name} está vacía`);
                         return;
@@ -475,7 +524,6 @@
                 });
             });
 
-            // --- LÓGICA DE TRANSFORMACIÓN DE COORDENADAS ---
             document.getElementById('transform-coords').addEventListener('click', () => document.getElementById('analysis-panel').classList.remove('collapsed'));
             
             document.getElementById('coord-system').addEventListener('change', (e) => {
@@ -514,6 +562,79 @@
                 document.getElementById('coord-result').innerHTML = result;
             });
             
+            const infoParcelaBtn = document.getElementById('info-parcela');
+
+            const toggleInfoParcela = () => {
+                infoParcelaActivo = !infoParcelaActivo;
+                if (infoParcelaActivo) {
+                    infoParcelaBtn.classList.add('active-tool');
+                    L.DomUtil.addClass(map._container, 'leaflet-help');
+                    map.on('click', getFeatureInfo);
+                } else {
+                    infoParcelaBtn.classList.remove('active-tool');
+                    L.DomUtil.removeClass(map._container, 'leaflet-help');
+                    map.off('click', getFeatureInfo);
+                }
+            };
+
+            const getFeatureInfo = async (e) => {
+                if (!map.hasLayer(catastroLayer)) {
+                    alert("La capa de Parcelas (IDECOR) debe estar activa para usar esta herramienta.");
+                    toggleInfoParcela();
+                    return;
+                }
+
+                const mapSize = map.getSize();
+                const bounds = map.getBounds();
+                const sw = bounds.getSouthWest();
+                const ne = bounds.getNorthEast();
+                
+                const params = {
+                    service: 'WMS',
+                    version: '1.1.1',
+                    request: 'GetFeatureInfo',
+                    layers: 'idecor:parcelas',
+                    query_layers: 'idecor:parcelas',
+                    info_format: 'application/json',
+                    bbox: `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`,
+                    width: mapSize.x,
+                    height: mapSize.y,
+                    srs: 'EPSG:4326',
+                    x: Math.round(e.containerPoint.x),
+                    y: Math.round(e.containerPoint.y),
+                    feature_count: 10
+                };
+
+                const url = new URL(wmsCatastroUrl);
+                Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    let content;
+                    if (data.features && data.features.length > 0) {
+                        const props = data.features[0].properties;
+                        content = '<h4><i class="fas fa-home"></i> Información de Parcela</h4><div style="max-height: 200px; overflow-y: auto; padding-right: 10px;">';
+                        for (const key in props) {
+                            const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            content += `<b>${formattedKey}:</b> ${props[key] || 'N/A'}<br>`;
+                        }
+                        content += '</div>';
+                    } else {
+                        content = "No se encontró información de parcela en este punto.";
+                    }
+                     L.popup({ maxWidth: 400 }).setLatLng(e.latlng).setContent(content).openOn(map);
+                } catch (error) {
+                    console.error("Error GetFeatureInfo:", error);
+                    alert("Ocurrió un error al consultar la información de la parcela.");
+                } finally {
+                    toggleInfoParcela();
+                }
+            };
+
+            infoParcelaBtn.addEventListener('click', toggleInfoParcela);
+            
             document.getElementById('show-3d').addEventListener('click', () => {
                  const container = document.getElementById('three-container'); container.style.display = 'block';
                  while(container.firstChild && container.firstChild.className !== 'close-btn') container.removeChild(container.firstChild);
@@ -534,11 +655,10 @@
                  animate();
             });
             document.querySelector('#three-container .close-btn').addEventListener('click', () => document.getElementById('three-container').style.display = 'none');
-            document.getElementById('print-map').addEventListener('click', () => { document.querySelectorAll('.custom-panel').forEach(p => p.style.display = 'none'); html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => { document.querySelectorAll('.custom-panel').forEach(p => p.style.display = 'block'); const imgData = canvas.toDataURL('image/png'); const printWindow = window.open('', '_blank'); printWindow.document.write(`<html><head><title>Mapa</title><style>@page{size:A4 landscape;margin:0}body{margin:0}img{width:100%}</style></head><body><img src="${imgData}" onload="window.print();setTimeout(window.close, 100)"/></body></html>`); }); });
-            document.getElementById('info-button').addEventListener('click', () => alert("Información de capas y datos internos de Vialidad Nacional."));
+            document.getElementById('print-map').addEventListener('click', () => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = 'none'); html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = ''); const imgData = canvas.toDataURL('image/png'); const printWindow = window.open('', '_blank'); printWindow.document.write(`<html><head><title>Mapa</title><style>@page{size:A4 landscape;margin:0}body{margin:0}img{width:100%}</style></head><body><img src="${imgData}" onload="window.print();setTimeout(window.close, 100)"/></body></html>`); }); });
             document.getElementById('descargarSeleccion').addEventListener('click', () => { if (seleccionActual.length === 0) return alert("No hay elementos seleccionados."); const geojson = L.featureGroup(seleccionActual).toGeoJSON(); geojson.features.forEach((f, i) => { f.properties.name = seleccionActual[i].featureData?.name || 'Elemento'; f.properties.description = seleccionActual[i].getPopup()?.getContent() || ''; }); const kml = tokml(geojson, { name: 'name', description: 'description' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kml); a.download = 'seleccion.kml'; a.click(); });
             document.getElementById('limpiarSeleccion').addEventListener('click', () => { seleccionActual.forEach(layer => { if (layer instanceof L.Marker) layer.setIcon(layer.originalIcon); else layer.setStyle(layer.originalStyle); }); seleccionActual = []; document.getElementById('selected-count').textContent = 0; });
-            // --- INICIALIZACIÓN FINAL ---
+
             loadDynamicLayers();
             makePanelDraggable(document.getElementById('tools-panel'));
             makePanelDraggable(document.getElementById('users-panel'));
