@@ -274,7 +274,8 @@
             const layersControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
 
             L.control.scale({imperial: false}).addTo(map);
-            map.pm.addControls({ position: 'topleft', drawPolyline: false, drawPolygon: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false });
+            // --- ELIMINACIÓN DE HERRAMIENTAS DE DIBUJO ---
+            // map.pm.addControls({ position: 'topleft', drawPolyline: false, drawPolygon: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false });
             map.pm.setLang('es');
 
             L.Control.North = L.Control.extend({ onAdd: function(map) { const c = L.DomUtil.create('div', 'leaflet-control-north'); c.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA1MCI+PHBhdGggZD0iTTIwIDAgTDAgMzUgTDIwIDI4IEw0MCAzNSBaIiBmaWxsPSJibGFjayIvPjx0ZXh0IHg9IjIwIiB5PSI0OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5OPC90ZXh0Pjwvc3ZnPg=="></img>'; return c; } });
@@ -393,14 +394,12 @@
                     
                     const data = XLSX.utils.sheet_to_json(workbook.Sheets['Hoja1']);
 
-                    // --- INICIO DE LA MODIFICACIÓN: Reemplazar nombre de columna ---
                     data.forEach(row => {
                         if (row.hasOwnProperty('Nomenclatura Oficial')) {
                             row['Antecedente Dominial'] = row['Nomenclatura Oficial'];
                             delete row['Nomenclatura Oficial'];
                         }
                     });
-                    // --- FIN DE LA MODIFICACIÓN ---
 
                     if (data.length === 0) {
                         console.warn(`La hoja ${file.name} está vacía`);
