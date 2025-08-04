@@ -1,0 +1,24 @@
+{
+"type": "FeatureCollection",
+"name": "MOJONES RN 077",
+"features": [
+{ "type": "Feature", "properties": { "Name": "76.49", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6690392, -30.809326 ] } },
+{ "type": "Feature", "properties": { "Name": "76.69", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.667424, -30.8083155 ] } },
+{ "type": "Feature", "properties": { "Name": "77.3", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6621336, -30.8059763 ] } },
+{ "type": "Feature", "properties": { "Name": "77.31", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6620431, -30.8059466 ] } },
+{ "type": "Feature", "properties": { "Name": "77.61", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6593264, -30.8050593 ] } },
+{ "type": "Feature", "properties": { "Name": "77.76", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.658, -30.8046 ] } },
+{ "type": "Feature", "properties": { "Name": "77.76", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.658, -30.8046 ] } },
+{ "type": "Feature", "properties": { "Name": "77.8", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6576049, -30.8045004 ] } },
+{ "type": "Feature", "properties": { "Name": "78.18", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6541879, -30.8033119 ] } },
+{ "type": "Feature", "properties": { "Name": "78.31", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6531833, -30.8025965 ] } },
+{ "type": "Feature", "properties": { "Name": "78.35", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6529221, -30.8023195 ] } },
+{ "type": "Feature", "properties": { "Name": "78.4", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.652638, -30.8019379 ] } },
+{ "type": "Feature", "properties": { "Name": "78.41", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6525864, -30.8018578 ] } },
+{ "type": "Feature", "properties": { "Name": "78.44", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6524508, -30.8016064 ] } },
+{ "type": "Feature", "properties": { "Name": "78.48", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6523007, -30.8012566 ] } },
+{ "type": "Feature", "properties": { "Name": "78.73", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6523852, -30.7989309 ] } },
+{ "type": "Feature", "properties": { "Name": "79.46", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6551874, -30.7925676 ] } },
+{ "type": "Feature", "properties": { "Name": "79.6", "P.K.": null, "Al.Dist. Izq.": null, "Al.Dist. Der.": null, "Ruta": 77 }, "geometry": { "type": "Point", "coordinates": [ -65.6557248, -30.791347 ] } }
+]
+}
