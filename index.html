@@ -124,12 +124,12 @@
         #data-info-icon:hover {
             fill: var(--secondary-color);
         }
-        #buffer-options {
+        #buffer-options, #coord-search-options {
             border-top: 1px solid #eee; 
             margin-top: 15px; 
             padding-top: 15px;
         }
-        #buffer-options h5 {
+        #buffer-options h5, #coord-search-options h5 {
             color: var(--primary-color);
             margin-bottom: 10px;
         }
@@ -173,6 +173,8 @@
                     <div class="gis-tool-btn" id="transform-coords" title="Transformar coordenadas"><i class="fas fa-exchange-alt"></i>Transformar</div>
                     <div class="gis-tool-btn" id="clear-drawings" title="Limpiar dibujos"><i class="fas fa-eraser"></i>Limpiar Dibujos</div>
                     <div class="gis-tool-btn" id="print-map" title="Imprimir mapa"><i class="fas fa-print"></i>Imprimir</div>
+                    <!-- CAMBIO: Botón de nueva herramienta añadido -->
+                    <div class="gis-tool-btn" id="coord-search-tool" title="Buscar por Coordenadas"><i class="fas fa-search-location"></i>Buscar Coords</div>
                 </div>
                 <!-- Panel de opciones de Buffer (inicialmente oculto) -->
                 <div id="buffer-options" class="hidden">
@@ -188,10 +190,20 @@
                     <button id="apply-buffer-btn"><i class="fas fa-check"></i> Aplicar Buffer</button>
                     <button id="cancel-buffer-btn" class="tool-btn" style="background-color: #f8f9fa;"><i class="fas fa-times"></i> Cancelar</button>
                 </div>
+                 <!-- CAMBIO: Panel de nueva herramienta añadido -->
+                <div id="coord-search-options" class="hidden">
+                    <h5><i class="fas fa-search-location"></i> Búsqueda por Coordenadas</h5>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Ingrese coordenadas para centrar el mapa y marcar un punto.</p>
+                    <label for="search-lat" style="font-size:12px; display:block; margin-bottom:5px;">Latitud:</label>
+                    <input type="text" id="search-lat" placeholder="-31.417" style="margin-bottom: 10px;">
+                    <label for="search-lon" style="font-size:12px; display:block; margin-bottom:5px;">Longitud:</label>
+                    <input type="text" id="search-lon" placeholder="-64.183" style="margin-bottom: 15px;">
+                    <button id="apply-coord-search-btn"><i class="fas fa-search"></i> Buscar</button>
+                    <button id="cancel-coord-search-btn" class="tool-btn" style="background-color: #f8f9fa;"><i class="fas fa-times"></i> Cancelar</button>
+                </div>
                 <button id="logout-button"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
             </div>
         </div>
-        <!-- CAMBIO 1: Se añade la clase 'hidden' para que el panel de análisis comience oculto -->
         <div id="analysis-panel" class="custom-panel hidden">
             <div class="panel-header"><h4 class="panel-title"><i class="fas fa-chart-bar"></i> Análisis Avanzado</h4><span class="toggle-btn">-</span></div>
             <div class="panel-content">
@@ -667,11 +679,14 @@
                 }
             };
             
-            // --- CAMBIO 2: LÓGICA DE HERRAMIENTAS ACTUALIZADA ---
+            // --- LÓGICA DE HERRAMIENTAS ACTUALIZADA ---
             const bufferToolBtn = document.getElementById('buffer-tool');
             const bufferOptionsDiv = document.getElementById('buffer-options');
             const transformCoordsBtn = document.getElementById('transform-coords');
             const analysisPanel = document.getElementById('analysis-panel');
+            // CAMBIO: Se añaden referencias a la nueva herramienta
+            const coordSearchToolBtn = document.getElementById('coord-search-tool');
+            const coordSearchOptionsDiv = document.getElementById('coord-search-options');
 
             const deactivateAllTools = () => {
                 // Desactivar Info Parcela
@@ -684,6 +699,9 @@
                 // Desactivar Transformar Coordenadas
                 transformCoordsBtn.classList.remove('active-tool');
                 analysisPanel.classList.add('hidden');
+                // CAMBIO: Se añade desactivación de la nueva herramienta
+                coordSearchToolBtn.classList.remove('active-tool');
+                coordSearchOptionsDiv.classList.add('hidden');
                 // Desactivar herramientas de dibujo de Leaflet.pm
                 map.pm.disableDraw();
             };
@@ -714,7 +732,19 @@
                 }
             });
 
+            // CAMBIO: Se añade la lógica de la nueva herramienta
+            coordSearchToolBtn.addEventListener('click', () => {
+                const isActive = coordSearchToolBtn.classList.contains('active-tool');
+                deactivateAllTools();
+                if (!isActive) {
+                    coordSearchToolBtn.classList.add('active-tool');
+                    coordSearchOptionsDiv.classList.remove('hidden');
+                }
+            });
+
             document.getElementById('cancel-buffer-btn').addEventListener('click', deactivateAllTools);
+            // CAMBIO: Se añade el evento para el botón de cancelar de la nueva herramienta
+            document.getElementById('cancel-coord-search-btn').addEventListener('click', deactivateAllTools);
 
             document.getElementById('apply-buffer-btn').addEventListener('click', () => {
                 if (seleccionActual.length === 0) {
@@ -756,6 +786,28 @@
                 }
             });
             
+            // CAMBIO: Se añade el evento para el botón de búsqueda de la nueva herramienta
+            document.getElementById('apply-coord-search-btn').addEventListener('click', () => {
+                const latStr = document.getElementById('search-lat').value.replace(',', '.');
+                const lonStr = document.getElementById('search-lon').value.replace(',', '.');
+                
+                const lat = parseFloat(latStr);
+                const lon = parseFloat(lonStr);
+
+                if (isNaN(lat) || isNaN(lon)) {
+                    alert("Por favor, ingrese coordenadas Lat/Lon válidas.");
+                    return;
+                }
+
+                const latlng = L.latLng(lat, lon);
+                map.setView(latlng, 18); // Centra el mapa con un buen nivel de zoom
+                
+                const marker = L.marker(latlng).addTo(drawingsGroup);
+                marker.bindPopup(`<b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lon.toFixed(6)}`).openPopup();
+                
+                deactivateAllTools(); // Oculta el panel de la herramienta después de la búsqueda
+            });
+
             document.getElementById('print-map').addEventListener('click', () => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = 'none'); html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = ''); const imgData = canvas.toDataURL('image/png'); const printWindow = window.open('', '_blank'); printWindow.document.write(`<html><head><title>Mapa</title><style>@page{size:A4 landscape;margin:0}body{margin:0}img{width:100%}</style></head><body><img src="${imgData}" onload="window.print();setTimeout(window.close, 100)"/></body></html>`); }); });
             document.getElementById('descargarSeleccion').addEventListener('click', () => { if (seleccionActual.length === 0) return alert("No hay elementos seleccionados."); const geojson = L.featureGroup(seleccionActual).toGeoJSON(); geojson.features.forEach((f, i) => { f.properties.name = seleccionActual[i].featureData?.name || 'Elemento'; f.properties.description = seleccionActual[i].getPopup()?.getContent() || ''; }); const kml = tokml(geojson, { name: 'name', description: 'description' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kml); a.download = 'seleccion.kml'; a.click(); });
             document.getElementById('limpiarSeleccion').addEventListener('click', () => { seleccionActual.forEach(layer => { if (layer instanceof L.Marker) layer.setIcon(layer.originalIcon); else layer.setStyle(layer.originalStyle); }); seleccionActual = []; document.getElementById('selected-count').textContent = 0; });
