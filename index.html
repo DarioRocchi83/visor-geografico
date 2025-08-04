@@ -191,7 +191,8 @@
                 <button id="logout-button"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
             </div>
         </div>
-        <div id="analysis-panel" class="custom-panel">
+        <!-- CAMBIO 1: Se añade la clase 'hidden' para que el panel de análisis comience oculto -->
+        <div id="analysis-panel" class="custom-panel hidden">
             <div class="panel-header"><h4 class="panel-title"><i class="fas fa-chart-bar"></i> Análisis Avanzado</h4><span class="toggle-btn">-</span></div>
             <div class="panel-content">
                 <div class="analysis-section">
@@ -558,8 +559,6 @@
                     marker.bindPopup(`<b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lng.toFixed(6)}`).openPopup();
                 });
             });
-
-            document.getElementById('transform-coords').addEventListener('click', () => document.getElementById('analysis-panel').classList.remove('collapsed'));
             
             document.getElementById('coord-system').addEventListener('change', (e) => {
                 const fajaSelector = document.getElementById('faja-selector-div');
@@ -667,19 +666,24 @@
                     toggleInfoParcela();
                 }
             };
-
-            // --- Lógica para nuevas herramientas ---
+            
+            // --- CAMBIO 2: LÓGICA DE HERRAMIENTAS ACTUALIZADA ---
             const bufferToolBtn = document.getElementById('buffer-tool');
             const bufferOptionsDiv = document.getElementById('buffer-options');
+            const transformCoordsBtn = document.getElementById('transform-coords');
+            const analysisPanel = document.getElementById('analysis-panel');
 
             const deactivateAllTools = () => {
-                // Desactivar Info Parcela si está activo
+                // Desactivar Info Parcela
                 if (infoParcelaActivo) {
                     toggleInfoParcela();
                 }
                 // Desactivar Buffer
                 bufferToolBtn.classList.remove('active-tool');
                 bufferOptionsDiv.classList.add('hidden');
+                // Desactivar Transformar Coordenadas
+                transformCoordsBtn.classList.remove('active-tool');
+                analysisPanel.classList.add('hidden');
                 // Desactivar herramientas de dibujo de Leaflet.pm
                 map.pm.disableDraw();
             };
@@ -698,6 +702,15 @@
                 if (!isActive) {
                     bufferToolBtn.classList.add('active-tool');
                     bufferOptionsDiv.classList.remove('hidden');
+                }
+            });
+
+            transformCoordsBtn.addEventListener('click', () => {
+                const isActive = transformCoordsBtn.classList.contains('active-tool');
+                deactivateAllTools();
+                if (!isActive) {
+                    transformCoordsBtn.classList.add('active-tool');
+                    analysisPanel.classList.remove('hidden');
                 }
             });
 
