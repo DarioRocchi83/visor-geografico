@@ -14,8 +14,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/proj4@2.7.5/dist/proj4.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
     <!-- Estilos -->
     <style>
         :root {
@@ -68,8 +66,6 @@
         .analysis-section h5 { margin-bottom: 12px; color: var(--primary-color); display: flex; align-items: center; gap: 8px; }
         .chart-container { width: 100%; height: 200px; margin-top: 15px; }
         .coordinate-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        #three-container { position: absolute; bottom: 20px; left: 20px; width: 300px; height: 200px; background: rgba(255, 255, 255, 0.9); border-radius: var(--border-radius); box-shadow: var(--shadow); z-index: 1000; overflow: hidden; display: none; }
-        .close-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.3); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1001; }
         .leaflet-tooltip-permanent { background-color: rgba(0, 0, 0, 0.85); color: white; border: none; padding: 8px 12px; font-weight: bold; border-radius: 6px; }
         .element-counter { font-size: 13px; color: #666; text-align: center; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; }
         .leaflet-control-north { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); }
@@ -142,7 +138,6 @@
                     <div class="gis-tool-btn" id="measure-area" title="Medir área"><i class="fas fa-draw-polygon"></i>Área</div>
                     <div class="gis-tool-btn" id="mark-coords" title="Marcar coordenada"><i class="fas fa-map-marker-alt"></i>Coordenada</div>
                     <div class="gis-tool-btn" id="transform-coords" title="Transformar coordenadas"><i class="fas fa-exchange-alt"></i>Transformar</div>
-                    <div class="gis-tool-btn" id="show-3d" title="Vista 3D"><i class="fas fa-cube"></i>Vista 3D</div>
                     <div class="gis-tool-btn" id="clear-drawings" title="Limpiar dibujos"><i class="fas fa-eraser"></i>Limpiar Dibujos</div>
                     <div class="gis-tool-btn" id="print-map" title="Imprimir mapa"><i class="fas fa-print"></i>Imprimir</div>
                 </div>
@@ -185,9 +180,6 @@
             <div class="panel-content"><ul id="users-list"></ul></div>
         </div>
         <div id="map"></div>
-        <div id="three-container">
-            <button class="close-btn">×</button>
-        </div>
     </div>
     <script type="module">
         // --- IMPORTACIONES Y CONFIGURACIÓN INICIAL ---
@@ -238,7 +230,6 @@
         function inicializarMapa() {
             let allFeatures = [], layerFields = {}, mainLayerGroups = {};
             let seleccionActual = [];
-            let threeScene, threeRenderer, threeCamera, threeControls;
             let infoParcelaActivo = false;
             function makePanelDraggable(panelElement) { const header = panelElement.querySelector('.panel-header'); if (!header) return; let isDragging = false, offsetX, offsetY; header.addEventListener('mousedown', (e) => { if (e.target.classList.contains('toggle-btn')) return; isDragging = true; offsetX = e.clientX - panelElement.offsetLeft; offsetY = e.clientY - panelElement.offsetTop; }); document.addEventListener('mousemove', (e) => { if (!isDragging) return; panelElement.style.left = `${e.clientX - offsetX}px`; panelElement.style.top = `${e.clientY - offsetY}px`; }); document.addEventListener('mouseup', () => { isDragging = false; }); }
             
@@ -274,8 +265,6 @@
             const layersControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
 
             L.control.scale({imperial: false}).addTo(map);
-            // --- ELIMINACIÓN DE HERRAMIENTAS DE DIBUJO ---
-            // map.pm.addControls({ position: 'topleft', drawPolyline: false, drawPolygon: false, drawMarker: false, drawRectangle: false, drawCircle: false, drawText: false });
             map.pm.setLang('es');
 
             L.Control.North = L.Control.extend({ onAdd: function(map) { const c = L.DomUtil.create('div', 'leaflet-control-north'); c.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA1MCI+PHBhdGggZD0iTTIwIDAgTDAgMzUgTDIwIDI4IEw0MCAzNSBaIiBmaWxsPSJibGFjayIvPjx0ZXh0IHg9IjIwIiB5PSI0OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5OPC90ZXh0Pjwvc3ZnPg=="></img>'; return c; } });
@@ -634,26 +623,6 @@
 
             infoParcelaBtn.addEventListener('click', toggleInfoParcela);
             
-            document.getElementById('show-3d').addEventListener('click', () => {
-                 const container = document.getElementById('three-container'); container.style.display = 'block';
-                 while(container.firstChild && container.firstChild.className !== 'close-btn') container.removeChild(container.firstChild);
-                 threeScene = new THREE.Scene(); threeScene.background = new THREE.Color(0xadd8e6);
-                 threeCamera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-                 threeRenderer = new THREE.WebGLRenderer({ antialias: true }); threeRenderer.setSize(container.clientWidth, container.clientHeight); container.appendChild(threeRenderer.domElement);
-                 const geometry = new THREE.PlaneGeometry(10, 10, 50, 50);
-                 const vertices = geometry.attributes.position.array;
-                 for (let i = 2; i < vertices.length; i += 3) vertices[i] = Math.random() * 0.8;
-                 geometry.computeVertexNormals();
-                 const material = new THREE.MeshPhongMaterial({ color: 0x27ae60, flatShading: true });
-                 const terrain = new THREE.Mesh(geometry, material); terrain.rotation.x = -Math.PI / 2; threeScene.add(terrain);
-                 threeScene.add(new THREE.AmbientLight(0xffffff, 0.7));
-                 const dirLight = new THREE.DirectionalLight(0xffffff, 0.5); dirLight.position.set(5, 10, 7); threeScene.add(dirLight);
-                 threeControls = new THREE.OrbitControls(threeCamera, threeRenderer.domElement);
-                 threeCamera.position.set(0, 5, 10); threeControls.update();
-                 function animate() { if (document.getElementById('three-container').style.display === 'block') { requestAnimationFrame(animate); threeControls.update(); threeRenderer.render(threeScene, threeCamera); } }
-                 animate();
-            });
-            document.querySelector('#three-container .close-btn').addEventListener('click', () => document.getElementById('three-container').style.display = 'none');
             document.getElementById('print-map').addEventListener('click', () => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = 'none'); html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = ''); const imgData = canvas.toDataURL('image/png'); const printWindow = window.open('', '_blank'); printWindow.document.write(`<html><head><title>Mapa</title><style>@page{size:A4 landscape;margin:0}body{margin:0}img{width:100%}</style></head><body><img src="${imgData}" onload="window.print();setTimeout(window.close, 100)"/></body></html>`); }); });
             document.getElementById('descargarSeleccion').addEventListener('click', () => { if (seleccionActual.length === 0) return alert("No hay elementos seleccionados."); const geojson = L.featureGroup(seleccionActual).toGeoJSON(); geojson.features.forEach((f, i) => { f.properties.name = seleccionActual[i].featureData?.name || 'Elemento'; f.properties.description = seleccionActual[i].getPopup()?.getContent() || ''; }); const kml = tokml(geojson, { name: 'name', description: 'description' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kml); a.download = 'seleccion.kml'; a.click(); });
             document.getElementById('limpiarSeleccion').addEventListener('click', () => { seleccionActual.forEach(layer => { if (layer instanceof L.Marker) layer.setIcon(layer.originalIcon); else layer.setStyle(layer.originalStyle); }); seleccionActual = []; document.getElementById('selected-count').textContent = 0; });
