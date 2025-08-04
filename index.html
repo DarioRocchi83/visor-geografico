@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/proj4@2.7.5/dist/proj4.js"></script>
+    <!-- Añadida librería Turf.js para Buffer -->
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
     <!-- Estilos -->
     <style>
         :root {
@@ -47,7 +49,7 @@
         #tools-panel { position: absolute; top: 20px; left: 20px; width: 350px; max-height: calc(100vh - 40px); overflow-y: auto; }
         #analysis-panel { position: absolute; top: 20px; right: 20px; width: 350px; max-height: 80vh; overflow-y: auto; }
         .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid #eee; background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; border-radius: var(--border-radius) var(--border-radius) 0 0; cursor: move; user-select: none; }
-        .panel-title { margin: 0; font-size: 1.1em; font-weight: 600; }
+        .panel-title { margin: 0; font-size: 1.1em; font-weight: 600; display: flex; align-items: center; }
         .toggle-btn { cursor: pointer; font-size: 1.3em; padding: 0 8px; transition: transform 0.3s; }
         .panel-content { padding: 20px; }
         .custom-panel.collapsed .panel-content { display: none; }
@@ -110,6 +112,28 @@
             margin-right: 10px; font-size: 0.9em; 
         }
 
+        #data-info-icon {
+            height: 1.1em;
+            width: 1.1em;
+            fill: white; 
+            vertical-align: -0.15em; 
+            margin-left: 10px;
+            cursor: pointer;
+            transition: fill 0.2s ease-in-out;
+        }
+        #data-info-icon:hover {
+            fill: var(--secondary-color);
+        }
+        #buffer-options {
+            border-top: 1px solid #eee; 
+            margin-top: 15px; 
+            padding-top: 15px;
+        }
+        #buffer-options h5 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -122,7 +146,15 @@
     </div>
     <div id="visor-container">
         <div id="tools-panel" class="custom-panel">
-             <div class="panel-header"><h4 class="panel-title"><i class="fas fa-tools"></i> Herramientas GIS</h4><span class="toggle-btn">-</span></div>
+             <div class="panel-header">
+                <h4 class="panel-title">
+                    <i class="fas fa-tools"></i> Herramientas GIS
+                    <svg id="data-info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" title="Información sobre la fuente de los datos">
+                        <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336h24V272H216c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24H216c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-144c-17.7 0-32-14.3-32-32s14.3-32 32-32s32 14.3 32 32s-14.3 32-32 32z"/>
+                    </svg>
+                </h4>
+                <span class="toggle-btn">-</span>
+            </div>
             <div class="panel-content">
                 <input type="text" id="buscador" placeholder="Buscar y mostrar resultados...">
                 <div class="search-filters">
@@ -137,9 +169,24 @@
                     <div class="gis-tool-btn" id="measure-distance" title="Medir distancia"><i class="fas fa-ruler"></i>Distancia</div>
                     <div class="gis-tool-btn" id="measure-area" title="Medir área"><i class="fas fa-draw-polygon"></i>Área</div>
                     <div class="gis-tool-btn" id="mark-coords" title="Marcar coordenada"><i class="fas fa-map-marker-alt"></i>Coordenada</div>
+                    <div class="gis-tool-btn" id="buffer-tool" title="Crear área de influencia (Buffer)"><i class="fas fa-bullseye"></i>Buffer</div>
                     <div class="gis-tool-btn" id="transform-coords" title="Transformar coordenadas"><i class="fas fa-exchange-alt"></i>Transformar</div>
                     <div class="gis-tool-btn" id="clear-drawings" title="Limpiar dibujos"><i class="fas fa-eraser"></i>Limpiar Dibujos</div>
                     <div class="gis-tool-btn" id="print-map" title="Imprimir mapa"><i class="fas fa-print"></i>Imprimir</div>
+                </div>
+                <!-- Panel de opciones de Buffer (inicialmente oculto) -->
+                <div id="buffer-options" class="hidden">
+                    <h5><i class="fas fa-bullseye"></i> Opciones de Buffer</h5>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Crea un área de influencia alrededor de los elementos seleccionados.</p>
+                    <label for="buffer-distance" style="font-size:12px; display:block; margin-bottom:5px;">Distancia:</label>
+                    <input type="number" id="buffer-distance" value="100" style="margin-bottom: 10px;">
+                    <label for="buffer-units" style="font-size:12px; display:block; margin-bottom:5px;">Unidades:</label>
+                    <select id="buffer-units" style="margin-bottom: 15px;">
+                        <option value="meters">Metros</option>
+                        <option value="kilometers">Kilómetros</option>
+                    </select>
+                    <button id="apply-buffer-btn"><i class="fas fa-check"></i> Aplicar Buffer</button>
+                    <button id="cancel-buffer-btn" class="tool-btn" style="background-color: #f8f9fa;"><i class="fas fa-times"></i> Cancelar</button>
                 </div>
                 <button id="logout-button"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
             </div>
@@ -231,7 +278,7 @@
             let allFeatures = [], layerFields = {}, mainLayerGroups = {};
             let seleccionActual = [];
             let infoParcelaActivo = false;
-            function makePanelDraggable(panelElement) { const header = panelElement.querySelector('.panel-header'); if (!header) return; let isDragging = false, offsetX, offsetY; header.addEventListener('mousedown', (e) => { if (e.target.classList.contains('toggle-btn')) return; isDragging = true; offsetX = e.clientX - panelElement.offsetLeft; offsetY = e.clientY - panelElement.offsetTop; }); document.addEventListener('mousemove', (e) => { if (!isDragging) return; panelElement.style.left = `${e.clientX - offsetX}px`; panelElement.style.top = `${e.clientY - offsetY}px`; }); document.addEventListener('mouseup', () => { isDragging = false; }); }
+            function makePanelDraggable(panelElement) { const header = panelElement.querySelector('.panel-header'); if (!header) return; let isDragging = false, offsetX, offsetY; header.addEventListener('mousedown', (e) => { if (e.target.closest('#data-info-icon') || e.target.classList.contains('toggle-btn')) return; isDragging = true; offsetX = e.clientX - panelElement.offsetLeft; offsetY = e.clientY - panelElement.offsetTop; }); document.addEventListener('mousemove', (e) => { if (!isDragging) return; panelElement.style.left = `${e.clientX - offsetX}px`; panelElement.style.top = `${e.clientY - offsetY}px`; }); document.addEventListener('mouseup', () => { isDragging = false; }); }
             
             const baseMaps = { 
                 "Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }), 
@@ -621,11 +668,91 @@
                 }
             };
 
-            infoParcelaBtn.addEventListener('click', toggleInfoParcela);
+            // --- Lógica para nuevas herramientas ---
+            const bufferToolBtn = document.getElementById('buffer-tool');
+            const bufferOptionsDiv = document.getElementById('buffer-options');
+
+            const deactivateAllTools = () => {
+                // Desactivar Info Parcela si está activo
+                if (infoParcelaActivo) {
+                    toggleInfoParcela();
+                }
+                // Desactivar Buffer
+                bufferToolBtn.classList.remove('active-tool');
+                bufferOptionsDiv.classList.add('hidden');
+                // Desactivar herramientas de dibujo de Leaflet.pm
+                map.pm.disableDraw();
+            };
+
+            infoParcelaBtn.addEventListener('click', () => {
+                const isActive = infoParcelaBtn.classList.contains('active-tool');
+                deactivateAllTools();
+                if (!isActive) {
+                    toggleInfoParcela();
+                }
+            });
+
+            bufferToolBtn.addEventListener('click', () => {
+                const isActive = bufferToolBtn.classList.contains('active-tool');
+                deactivateAllTools();
+                if (!isActive) {
+                    bufferToolBtn.classList.add('active-tool');
+                    bufferOptionsDiv.classList.remove('hidden');
+                }
+            });
+
+            document.getElementById('cancel-buffer-btn').addEventListener('click', deactivateAllTools);
+
+            document.getElementById('apply-buffer-btn').addEventListener('click', () => {
+                if (seleccionActual.length === 0) {
+                    alert("Por favor, seleccione al menos un elemento en el mapa para crear un buffer.");
+                    return;
+                }
+
+                const distance = parseFloat(document.getElementById('buffer-distance').value);
+                const units = document.getElementById('buffer-units').value;
+
+                if (isNaN(distance) || distance <= 0) {
+                    alert("Por favor, ingrese una distancia válida y positiva para el buffer.");
+                    return;
+                }
+
+                try {
+                    seleccionActual.forEach(layer => {
+                        const geojsonFeature = layer.toGeoJSON();
+                        const buffered = turf.buffer(geojsonFeature, distance, { units: units });
+                        
+                        const bufferLayer = L.geoJSON(buffered, {
+                            style: {
+                                color: '#3388ff',
+                                weight: 2,
+                                opacity: 1,
+                                fillOpacity: 0.3
+                            }
+                        });
+                        drawingsGroup.addLayer(bufferLayer);
+                    });
+                     if (drawingsGroup.getLayers().length > 0) {
+                        map.fitBounds(drawingsGroup.getBounds().pad(0.1));
+                    }
+                } catch (error) {
+                    alert("Ocurrió un error al crear el buffer. Verifique los datos y la distancia.");
+                    console.error("Error al crear buffer con Turf.js:", error);
+                } finally {
+                    deactivateAllTools();
+                }
+            });
             
             document.getElementById('print-map').addEventListener('click', () => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = 'none'); html2canvas(document.querySelector("#map"), { useCORS: true }).then(canvas => { document.querySelectorAll('.custom-panel, .leaflet-control-container').forEach(p => p.style.display = ''); const imgData = canvas.toDataURL('image/png'); const printWindow = window.open('', '_blank'); printWindow.document.write(`<html><head><title>Mapa</title><style>@page{size:A4 landscape;margin:0}body{margin:0}img{width:100%}</style></head><body><img src="${imgData}" onload="window.print();setTimeout(window.close, 100)"/></body></html>`); }); });
             document.getElementById('descargarSeleccion').addEventListener('click', () => { if (seleccionActual.length === 0) return alert("No hay elementos seleccionados."); const geojson = L.featureGroup(seleccionActual).toGeoJSON(); geojson.features.forEach((f, i) => { f.properties.name = seleccionActual[i].featureData?.name || 'Elemento'; f.properties.description = seleccionActual[i].getPopup()?.getContent() || ''; }); const kml = tokml(geojson, { name: 'name', description: 'description' }); const a = document.createElement('a'); a.href = 'data:application/vnd.google-earth.kml+xml;charset=utf-8,' + encodeURIComponent(kml); a.download = 'seleccion.kml'; a.click(); });
             document.getElementById('limpiarSeleccion').addEventListener('click', () => { seleccionActual.forEach(layer => { if (layer instanceof L.Marker) layer.setIcon(layer.originalIcon); else layer.setStyle(layer.originalStyle); }); seleccionActual = []; document.getElementById('selected-count').textContent = 0; });
+
+            document.getElementById('data-info-icon').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const infoText = "La información catastral de los polígonos parcelarios proviene de la plataforma Mapas Córdoba de IDECOR, que es la fuente oficial y titular de estos datos.\n\n" +
+                                 "La información presentada en los iconos corresponde a la nomenclatura interna de carpetas utilizada por el Área de Tierras Distrito 2 Córdoba de la Dirección Nacional de Vialidad, y está destinada exclusivamente a fines administrativos internos.";
+                alert(infoText);
+            });
 
             loadDynamicLayers();
             makePanelDraggable(document.getElementById('tools-panel'));
