@@ -281,7 +281,21 @@
         onAuthStateChanged(auth, (user) => { if (user) { document.getElementById('auth-container').classList.add('hidden'); document.getElementById('visor-container').style.display = 'block'; if (!mapInitialized) { inicializarMapa(); mapInitialized = true; } const userRef = ref(database, `connected_users/${user.uid}`); set(userRef, { name: user.email, connected_at: serverTimestamp() }); onDisconnect(userRef).remove(); } else { document.getElementById('auth-container').classList.remove('hidden'); document.getElementById('visor-container').style.display = 'none'; } });
         onValue(ref(database, 'connected_users'), (snapshot) => { const usersList = document.getElementById('users-list'); usersList.innerHTML = ''; const users = snapshot.val(); if (users && Object.keys(users).length > 0) { Object.values(users).forEach(user => { const li = document.createElement('li'); li.textContent = user.name; usersList.appendChild(li); }); } else { usersList.innerHTML = '<li>Nadie más conectado.</li>'; } });
         document.getElementById('login-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; try { await signInWithEmailAndPassword(auth, email, password); } catch (error) { document.getElementById('login-error').textContent = "Error de credenciales."; } });
-        document.getElementById('register-form').addEventListener('submit', async (e) => { e.preventDefault(); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; try { await createUserWithEmailAndPassword(auth, email, password); } catch (error) { document.getElementById('register-error').textContent = "Error al registrar: " + error.message; } });
+        
+        // --- MODIFICACIÓN AQUÍ ---
+        document.getElementById('register-form').addEventListener('submit', async (e) => { 
+            e.preventDefault(); 
+            // Alerta de seguridad añadida
+            alert("¡Aviso de Seguridad! Los datos que se ingresan (usuario y contraseña) carecen de seguridad informática. Se recomienda no ingresar datos personales, utilizar un nombre de usuario genérico para ser identificado en el visor y una clave única para esta aplicación.");
+            const email = document.getElementById('register-email').value; 
+            const password = document.getElementById('register-password').value; 
+            try { 
+                await createUserWithEmailAndPassword(auth, email, password); 
+            } catch (error) { 
+                document.getElementById('register-error').textContent = "Error al registrar: " + error.message; 
+            } 
+        });
+
         document.getElementById('logout-button').addEventListener('click', async () => { const user = auth.currentUser; if (user) await remove(ref(database, `connected_users/${user.uid}`)); await signOut(auth); });
         document.getElementById('show-register').addEventListener('click', () => { document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden'); });
         document.getElementById('show-login').addEventListener('click', () => { document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); });
