@@ -1,14 +1,3 @@
-¡Hola! Entendido perfectamente. Quieres que el botón **"Limpiar Dibujos"** funcione como un reseteo general del mapa, eliminando no solo las mediciones y dibujos, sino también los resultados de búsqueda, las selecciones, las capas cargadas por el usuario y cualquier otro elemento temporal.
-
-Para garantizar que el cambio se aplique sin errores, te proporcionaré el código completo y actualizado del archivo `index.html`. He modificado únicamente la sección necesaria, añadiendo comentarios para que puedas identificar fácilmente qué ha cambiado.
-
-### Código `index.html` Completo y Actualizado
-
-Aquí tienes el código listo para copiar y pegar, reemplazando el contenido de tu archivo `index.html` actual.
-
-```html
---- START OF FILE index.html ---
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -676,26 +665,13 @@ Aquí tienes el código listo para copiar y pegar, reemplazando el contenido de 
 
             document.getElementById('measure-distance').addEventListener('click', () => map.pm.enableDraw('Line'));
             document.getElementById('measure-area').addEventListener('click', () => map.pm.enableDraw('Polygon'));
-
-            // ========== INICIO DE LA MODIFICACIÓN ==========
-            // El código anterior del botón "Limpiar Dibujos" ha sido reemplazado por esta versión mejorada.
             document.getElementById('clear-drawings').addEventListener('click', () => {
-                // 1. Desactivar cualquier herramienta que esté activa.
                 deactivateAllTools();
-
-                // 2. Limpiar dibujos (mediciones, coordenadas marcadas, buffers, etc.).
-                // Estos elementos se añaden a `drawingsGroup`.
                 drawingsGroup.clearLayers();
-
-                // 3. Limpiar los resultados de la búsqueda y resetear los filtros.
                 searchResultsLayer.clearLayers();
                 document.getElementById('buscador').value = '';
                 document.getElementById('layer-filter').selectedIndex = 0;
-                // Disparamos un evento 'change' para que se actualice el filtro de campos y se llame a applyFilters(),
-                // lo que restaurará la visibilidad de las capas originales.
                 document.getElementById('layer-filter').dispatchEvent(new Event('change'));
-
-                // 4. Limpiar la selección actual (replicando la lógica del botón "Limpiar Selección").
                 seleccionActual.forEach(layer => {
                     if (layer instanceof L.Marker) {
                         if (layer.originalIcon) {
@@ -709,20 +685,14 @@ Aquí tienes el código listo para copiar y pegar, reemplazando el contenido de 
                 });
                 seleccionActual = [];
                 document.getElementById('selected-count').textContent = 0;
-
-                // 5. Eliminar la capa cargada por el usuario (KML/KMZ/GeoJSON).
                 if (window.capaCargada && map.hasLayer(window.capaCargada)) {
                     map.removeLayer(window.capaCargada);
                     window.capaCargada = null; // Limpiar la referencia para futuras cargas.
                 }
-
-                // 6. Cerrar cualquier popup que esté abierto en el mapa.
                 map.closePopup();
 
                 console.log('Estado del mapa reseteado: dibujos, búsquedas, selecciones y capas temporales limpiadas.');
             });
-            // ========== FIN DE LA MODIFICACIÓN ==========
-
 
             document.getElementById('mark-coords').addEventListener('click', function() {
                 L.DomUtil.addClass(map._container, 'leaflet-crosshair');
@@ -964,8 +934,6 @@ Aquí tienes el código listo para copiar y pegar, reemplazando el contenido de 
             makePanelDraggable(document.getElementById('analysis-panel'));
         }
     </script>
-
-    <!-- === FUNCIONALIDADES CORREGIDAS: Cargar Capas y Buscar Coordenadas === -->
     <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 
@@ -1080,3 +1048,4 @@ Aquí tienes el código listo para copiar y pegar, reemplazando el contenido de 
     </script>
 </body>
 </html>
+
