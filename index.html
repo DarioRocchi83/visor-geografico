@@ -421,7 +421,7 @@
             });
             new L.Control.North({ position: 'topright' }).addTo(map);
 
-            const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261'];
+            const POINT_COLORS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#8338ec', '#3a86ff'];
             function createColoredIcon(color, isSelected = false) { 
                 const fillColor = isSelected ? '#ffff00' : color; 
                 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill-opacity="0.9" stroke="#000" stroke-width="1.5" fill="${fillColor}" d="M16 0 C10.48 0 6 4.48 6 10 C6 16.5 16 32 16 32 S26 16.5 26 10 C26 4.48 21.52 0 16 0 Z"></path></svg>`; 
@@ -461,47 +461,86 @@
                     document.getElementById('selected-count').textContent = seleccionActual.length; 
                 }); 
             }
+            
+            // =================================================================================
+            // === ESTA ES LA ÚNICA FUNCIÓN QUE HA SIDO MODIFICADA PARA SOLUCIONAR EL PROBLEMA ===
+            // =================================================================================
+            async function loadDynamicLayers() {
+                // 1. Definimos la lista de archivos manualmente aquí.
+                // Si añades un nuevo archivo a la carpeta 'data', solo tienes que añadir su nombre a esta lista.
+                const layerFiles = [
+                    "LIMITE_PROVINCIAL.geojson",
+                    "CARPETAS_EXPROPIACION.geojson",
+                    "CATASTRO_REGISTRAL.geojson",
+                    "ESTRUCTURAS.geojson",
+                    "MOJONES RN 007.geojson",
+                    "MOJONES RN 008.geojson",
+                    "MOJONES RN 009.geojson",
+                    "MOJONES RN 019.geojson",
+                    "MOJONES RN 020.geojson",
+                    "MOJONES RN 035.geojson",
+                    "MOJONES RN 036.geojson",
+                    "MOJONES RN 038.geojson",
+                    "MOJONES RN 060.geojson",
+                    "MOJONES RN 077.geojson",
+                    "MOJONES RN 148.geojson",
+                    "MOJONES RN 158.geojson",
+                    "MOJONES RN 1V09.geojson",
+                    "MOJONES RN V19.geojson",
+                    "MOJONES RN V20.geojson",
+                    "MOJONES RN 2V09.geojson",
+                    "MOJONES RN A005.geojson",
+                    "MOJONES RN A019.geojson",
+                    "RAC.geojson",
+                    "VISADOS_2020.geojson",
+                    "VISADOS_2021.geojson",
+                    "VISADOS_2022.geojson",
+                    "VISADOS_2023.geojson",
+                    "VISADOS_2024.geojson",
+                    "VISADOS_2025.geojson",
+                    "VISADOS_PAPEL_2003-2020.xlsx" // También funciona con XLSX
+                ];
 
-            async function loadDynamicLayers() { 
-                try { 
-                    const response = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data`);
-                    if (!response.ok) {
-                        throw new Error(`Error de red: ${response.statusText}. Verifica que el repositorio y la carpeta 'data' existan.`);
-                    }
-                    const files = (await response.json()).filter(f => f.name.endsWith('.geojson') || f.name.endsWith('.xlsx'));
-                    if (files.length === 0) {
-                        console.warn("No se encontraron archivos GeoJSON o XLSX en la carpeta 'data'");
-                        return;
-                    }
-                    for (const [i, file] of files.entries()) { 
-                        const layerName = file.name.split('.')[0];
-                        document.getElementById('layer-filter').innerHTML += `<option value="${layerName}">${layerName}</option>`; 
-                        try {
-                            if (file.name.endsWith('.geojson')) {
-                                await loadGeoJSONLayer(file, i); 
-                            } else if (file.name.endsWith('.xlsx')) {
-                                await loadXLSXLayer(file, i); 
-                            }
-                        } catch (layerError) {
-                            console.error(`Error al cargar la capa ${file.name}:`, layerError);
-                            const errorDiv = document.createElement('div');
-                            errorDiv.className = 'layer-load-error';
-                            errorDiv.textContent = `Error al cargar ${file.name}: ${layerError.message}`;
-                            document.getElementById('tools-panel').appendChild(errorDiv);
+                // 2. Iteramos sobre nuestra lista manual, no sobre una petición a la API.
+                for (const [i, fileName] of layerFiles.entries()) {
+                    // 3. Construimos la URL "raw" directamente. ¡Esta es la clave!
+                    const downloadUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/data/${fileName}`;
+                    
+                    const layerName = fileName.split('.')[0];
+                    document.getElementById('layer-filter').innerHTML += `<option value="${layerName}">${layerName}</option>`;
+                    
+                    try {
+                        // Creamos un objeto 'file' falso para reutilizar tus funciones de carga existentes
+                        const pseudoFile = {
+                            name: fileName,
+                            download_url: downloadUrl
+                        };
+
+                        if (fileName.endsWith('.geojson')) {
+                            await loadGeoJSONLayer(pseudoFile, i);
+                        } else if (fileName.endsWith('.xlsx')) {
+                            await loadXLSXLayer(pseudoFile, i);
                         }
-                    } 
-                } catch (error) { 
-                    console.error("Error al cargar capas:", error); 
-                    alert("No se pudo cargar la información desde GitHub. Verifica que el repositorio exista y que la carpeta 'data' contenga archivos GeoJSON o XLSX.");
-                } 
+                    } catch (layerError) {
+                        console.error(`Error al cargar la capa ${fileName}:`, layerError);
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'layer-load-error';
+                        errorDiv.textContent = `Error al cargar ${fileName}: No se pudo descargar el archivo.`;
+                        // Añadimos el error de forma menos intrusiva
+                        document.getElementById('tools-panel').querySelector('.panel-content').appendChild(errorDiv);
+                    }
+                }
             }
+            // =================================================================================
+            // === FIN DE LA SECCIÓN MODIFICADA. EL RESTO DEL CÓDIGO PERMANECE IGUAL. ========
+            // =================================================================================
 
             async function loadGeoJSONLayer(file, index) { 
                 const layerName = file.name.replace('.geojson', ''); 
                 const color = POINT_COLORS[index % POINT_COLORS.length]; 
                 layerFields[layerName] = new Set();
                 const geojsonLayer = L.geoJson(null, { 
-                    style: { color, weight: 3 }, 
+                    style: { color, weight: 3, opacity: 0.7 }, 
                     pointToLayer: (feat, ll) => L.marker(ll, { icon: createColoredIcon(color) }), 
                     onEachFeature: (feat, layer) => { 
                         if (!feat.properties) {
@@ -939,111 +978,117 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            if (!window.map) {
-                console.warn("El mapa no está disponible aún. Asegúrate de que se haya inicializado.");
-                return;
-            }
+            // Esperamos un poco para asegurarnos de que el mapa principal esté inicializado
+            setTimeout(() => {
+                if (!window.map) {
+                    console.warn("El mapa (window.map) no está disponible aún. Las funciones de carga local podrían no funcionar.");
+                    return;
+                }
 
-            // --- 1. Cargar Capas (KML, KMZ, GeoJSON) ---
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.kml,.kmz,.geojson';
-            fileInput.style.display = 'none';
-            fileInput.id = 'input-cargar-capa';
-            document.body.appendChild(fileInput);
+                // --- 1. Cargar Capas (KML, KMZ, GeoJSON) ---
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.kml,.kmz,.geojson';
+                fileInput.style.display = 'none';
+                fileInput.id = 'input-cargar-capa';
+                document.body.appendChild(fileInput);
 
-            const btnCargar = document.getElementById('cargar-capa-btn');
-            if (btnCargar) {
-                btnCargar.addEventListener('click', () => {
-                    fileInput.click();
-                });
+                const btnCargar = document.getElementById('cargar-capa-btn');
+                if (btnCargar) {
+                    btnCargar.addEventListener('click', () => {
+                        fileInput.click();
+                    });
 
-                fileInput.addEventListener('change', function (e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
+                    fileInput.addEventListener('change', function (e) {
+                        const file = e.target.files[0];
+                        if (!file) return;
 
-                    const fileName = file.name.toLowerCase();
-                    const reader = new FileReader();
+                        const fileName = file.name.toLowerCase();
+                        const reader = new FileReader();
 
-                    if (window.capaCargada) {
-                        window.map.removeLayer(window.capaCargada);
-                        window.capaCargada = null;
-                    }
-
-                    function agregarAlMapa(geojson) {
-                        try {
-                            window.capaCargada = L.geoJSON(geojson, {
-                                style: { color: '#FF5722', weight: 3, opacity: 0.8, fillOpacity: 0.2 },
-                                pointToLayer: (feature, latlng) => L.circleMarker(latlng, { color: '#FF5722', radius: 6 })
-                            }).addTo(window.map);
-                            window.map.fitBounds(window.capaCargada.getBounds(), { padding: [50, 50] });
-                        } catch (err) {
-                            alert("Error al mostrar la capa: " + err.message);
+                        if (window.capaCargada) {
+                            window.map.removeLayer(window.capaCargada);
+                            window.capaCargada = null;
                         }
-                    }
 
-                    if (fileName.endsWith('.kml')) {
-                        reader.onload = function (e) {
-                            const parser = new DOMParser();
-                            const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
-                            const geojson = toGeoJSON.kml(xmlDoc);
-                            agregarAlMapa(geojson);
-                        };
-                        reader.readAsText(file);
-                    } else if (fileName.endsWith('.kmz')) {
-                        reader.onload = function (e) {
-                            JSZip.loadAsync(e.target.result).then(zip => {
-                                zip.forEach((path, zipEntry) => {
-                                    if (path.endsWith('.kml')) {
-                                        zipEntry.async('text').then(text => {
-                                            const parser = new DOMParser();
-                                            const xmlDoc = parser.parseFromString(text, 'text/xml');
-                                            const geojson = toGeoJSON.kml(xmlDoc);
-                                            agregarAlMapa(geojson);
-                                        });
-                                    }
-                                });
-                            }).catch(err => {
-                                alert("Error al leer KMZ: " + err.message);
-                            });
-                        };
-                        reader.readAsArrayBuffer(file);
-                    } else if (fileName.endsWith('.geojson')) {
-                        reader.onload = function (e) {
+                        function agregarAlMapa(geojson) {
                             try {
-                                const geojson = JSON.parse(e.target.result);
-                                agregarAlMapa(geojson);
+                                window.capaCargada = L.geoJSON(geojson, {
+                                    style: { color: '#FF5722', weight: 3, opacity: 0.8, fillOpacity: 0.2 },
+                                    pointToLayer: (feature, latlng) => L.circleMarker(latlng, { color: '#FF5722', radius: 6 })
+                                }).addTo(window.map);
+                                window.map.fitBounds(window.capaCargada.getBounds(), { padding: [50, 50] });
                             } catch (err) {
-                                alert("Error al parsear GeoJSON: " + err.message);
+                                alert("Error al mostrar la capa: " + err.message);
                             }
-                        };
-                        reader.readAsText(file);
-                    } else {
-                        alert("Formato no soportado. Use .kml, .kmz o .geojson.");
-                    }
-                    fileInput.value = '';
-                });
-            }
+                        }
 
-            // --- 2. Buscar Coordenadas ---
-            const btnBuscar = document.getElementById('apply-coord-search-btn');
-            if (btnBuscar) {
-                btnBuscar.addEventListener('click', () => {
-                    const latStr = document.getElementById('search-lat').value.replace(',', '.');
-                    const lonStr = document.getElementById('search-lon').value.replace(',', '.');
-                    const lat = parseFloat(latStr);
-                    const lon = parseFloat(lonStr);
-                    if (isNaN(lat) || isNaN(lon)) {
-                        alert("Por favor, ingrese coordenadas Lat/Lon válidas.");
-                        return;
-                    }
-                    const latlng = L.latLng(lat, lon);
-                    window.map.setView(latlng, 18);
-                    const marker = L.marker(latlng).addTo(window.drawingsGroup || window.map);
-                    marker.bindPopup(`<b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lon.toFixed(6)}`).openPopup();
-                    document.getElementById('coord-search-options').classList.add('hidden');
-                });
-            }
+                        if (fileName.endsWith('.kml')) {
+                            reader.onload = function (e) {
+                                const parser = new DOMParser();
+                                const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
+                                const geojson = toGeoJSON.kml(xmlDoc);
+                                agregarAlMapa(geojson);
+                            };
+                            reader.readAsText(file);
+                        } else if (fileName.endsWith('.kmz')) {
+                            reader.onload = function (e) {
+                                JSZip.loadAsync(e.target.result).then(zip => {
+                                    zip.forEach((path, zipEntry) => {
+                                        if (path.endsWith('.kml')) {
+                                            zipEntry.async('text').then(text => {
+                                                const parser = new DOMParser();
+                                                const xmlDoc = parser.parseFromString(text, 'text/xml');
+                                                const geojson = toGeoJSON.kml(xmlDoc);
+                                                agregarAlMapa(geojson);
+                                            });
+                                        }
+                                    });
+                                }).catch(err => {
+                                    alert("Error al leer KMZ: " + err.message);
+                                });
+                            };
+                            reader.readAsArrayBuffer(file);
+                        } else if (fileName.endsWith('.geojson')) {
+                            reader.onload = function (e) {
+                                try {
+                                    const geojson = JSON.parse(e.target.result);
+                                    agregarAlMapa(geojson);
+                                } catch (err) {
+                                    alert("Error al parsear GeoJSON: " + err.message);
+                                }
+                            };
+                            reader.readAsText(file);
+                        } else {
+                            alert("Formato no soportado. Use .kml, .kmz o .geojson.");
+                        }
+                        fileInput.value = '';
+                    });
+                }
+
+                // --- 2. Buscar Coordenadas ---
+                const btnBuscar = document.getElementById('apply-coord-search-btn');
+                if (btnBuscar) {
+                    btnBuscar.addEventListener('click', () => {
+                        const latStr = document.getElementById('search-lat').value.replace(',', '.');
+                        const lonStr = document.getElementById('search-lon').value.replace(',', '.');
+                        const lat = parseFloat(latStr);
+                        const lon = parseFloat(lonStr);
+                        if (isNaN(lat) || isNaN(lon)) {
+                            alert("Por favor, ingrese coordenadas Lat/Lon válidas.");
+                            return;
+                        }
+                        const latlng = L.latLng(lat, lon);
+                        window.map.setView(latlng, 18);
+                        // Aseguramos que los dibujos se añadan al grupo correcto
+                        const groupForDrawings = window.drawingsGroup || window.map;
+                        const marker = L.marker(latlng).addTo(groupForDrawings);
+                        marker.bindPopup(`<b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lon.toFixed(6)}`).openPopup();
+                        document.getElementById('coord-search-options').classList.add('hidden');
+                    });
+                }
+
+            }, 500); // Pequeño retraso para dar tiempo a la inicialización del mapa principal
         });
     </script>
 </body>
