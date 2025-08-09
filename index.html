@@ -462,79 +462,6 @@
                 }); 
             }
             
-            // =================================================================================
-            // === ESTA ES LA ÚNICA FUNCIÓN QUE HA SIDO MODIFICADA PARA SOLUCIONAR EL PROBLEMA ===
-            // =================================================================================
-            async function loadDynamicLayers() {
-                // 1. Definimos la lista de archivos manualmente aquí.
-                // Si añades un nuevo archivo a la carpeta 'data', solo tienes que añadir su nombre a esta lista.
-                const layerFiles = [
-                    "LIMITE_PROVINCIAL.geojson",
-                    "CARPETAS_EXPROPIACION.geojson",
-                    "CATASTRO_REGISTRAL.geojson",
-                    "ESTRUCTURAS.geojson",
-                    "MOJONES RN 007.geojson",
-                    "MOJONES RN 008.geojson",
-                    "MOJONES RN 009.geojson",
-                    "MOJONES RN 019.geojson",
-                    "MOJONES RN 020.geojson",
-                    "MOJONES RN 035.geojson",
-                    "MOJONES RN 036.geojson",
-                    "MOJONES RN 038.geojson",
-                    "MOJONES RN 060.geojson",
-                    "MOJONES RN 077.geojson",
-                    "MOJONES RN 148.geojson",
-                    "MOJONES RN 158.geojson",
-                    "MOJONES RN 1V09.geojson",
-                    "MOJONES RN V19.geojson",
-                    "MOJONES RN V20.geojson",
-                    "MOJONES RN 2V09.geojson",
-                    "MOJONES RN A005.geojson",
-                    "MOJONES RN A019.geojson",
-                    "RAC.geojson",
-                    "VISADOS_2020.geojson",
-                    "VISADOS_2021.geojson",
-                    "VISADOS_2022.geojson",
-                    "VISADOS_2023.geojson",
-                    "VISADOS_2024.geojson",
-                    "VISADOS_2025.geojson",
-                    "VISADOS_PAPEL_2003-2020.xlsx" // También funciona con XLSX
-                ];
-
-                // 2. Iteramos sobre nuestra lista manual, no sobre una petición a la API.
-                for (const [i, fileName] of layerFiles.entries()) {
-                    // 3. Construimos la URL "raw" directamente. ¡Esta es la clave!
-                    const downloadUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/data/${fileName}`;
-                    
-                    const layerName = fileName.split('.')[0];
-                    document.getElementById('layer-filter').innerHTML += `<option value="${layerName}">${layerName}</option>`;
-                    
-                    try {
-                        // Creamos un objeto 'file' falso para reutilizar tus funciones de carga existentes
-                        const pseudoFile = {
-                            name: fileName,
-                            download_url: downloadUrl
-                        };
-
-                        if (fileName.endsWith('.geojson')) {
-                            await loadGeoJSONLayer(pseudoFile, i);
-                        } else if (fileName.endsWith('.xlsx')) {
-                            await loadXLSXLayer(pseudoFile, i);
-                        }
-                    } catch (layerError) {
-                        console.error(`Error al cargar la capa ${fileName}:`, layerError);
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'layer-load-error';
-                        errorDiv.textContent = `Error al cargar ${fileName}: No se pudo descargar el archivo.`;
-                        // Añadimos el error de forma menos intrusiva
-                        document.getElementById('tools-panel').querySelector('.panel-content').appendChild(errorDiv);
-                    }
-                }
-            }
-            // =================================================================================
-            // === FIN DE LA SECCIÓN MODIFICADA. EL RESTO DEL CÓDIGO PERMANECE IGUAL. ========
-            // =================================================================================
-
             async function loadGeoJSONLayer(file, index) { 
                 const layerName = file.name.replace('.geojson', ''); 
                 const color = POINT_COLORS[index % POINT_COLORS.length]; 
@@ -1092,4 +1019,5 @@
         });
     </script>
 </body>
+
 </html>
