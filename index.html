@@ -430,16 +430,24 @@
             
             // --- LÓGICA DE HERRAMIENTAS GIS ---
             
-            // ===== MODIFICACIÓN INICIO: Lógica de medición y borrado mejorada =====
+            // ===== MODIFICACIÓN INICIO: Lógica de medición y borrado 100% robusta =====
+            
+            // Grupo para gestionar todas las capas dibujadas por el usuario (medidas, marcadores, etc.)
+            const drawingsGroup = L.featureGroup().addTo(map);
+
             const updateMeasurementLabel = (layer) => {
                 if (!layer) return;
                 let text = '';
+
+                // Verifica si es un polígono ANTES de verificar si es una línea
                 if (layer instanceof L.Polygon) {
                     const area = L.PM.Utils.getArea(layer);
-                    if (area > 0) { // Solo mostrar si hay área
-                        text = area > 10000 ? `Área: ${(area / 1000000).toFixed(2)} km²` : `Área: ${area.toFixed(0)} m²`;
-                    }
-                } else if (layer instanceof L.Polyline) {
+                    text = area > 10000 
+                        ? `Área: ${(area / 1000000).toFixed(2)} km²` 
+                        : `Área: ${area.toFixed(0)} m²`;
+                } 
+                // Si no es un polígono, comprueba si es una línea
+                else if (layer instanceof L.Polyline) {
                     let dist = 0;
                     const latlngs = layer.getLatLngs();
                     if(L.Util.isArray(latlngs) && latlngs.length > 1) {
@@ -447,9 +455,9 @@
                            dist += latlngs[i-1].distanceTo(latlngs[i]);
                        }
                     }
-                    if (dist > 0) { // Solo mostrar si hay distancia
-                        text = dist > 1000 ? `Distancia: ${(dist/1000).toFixed(2)} km` : `Distancia: ${dist.toFixed(0)} m`;
-                    }
+                    text = dist > 1000 
+                        ? `Distancia: ${(dist/1000).toFixed(2)} km` 
+                        : `Distancia: ${dist.toFixed(0)} m`;
                 }
                 
                 if (text) {
@@ -458,39 +466,35 @@
                     } else {
                         layer.bindTooltip(text, { permanent: true, className: 'leaflet-tooltip-permanent', direction: 'center' }).openTooltip();
                     }
-                } else if (layer.getTooltip()) { // Ocultar si no hay texto
-                    layer.unbindTooltip();
                 }
             };
             
-            // Evento cuando se empieza a dibujar para actualizar la medida en tiempo real
-            map.on('pm:drawstart', (e) => {
-                const layer = e.workingLayer;
-                layer.on('pm:vertexadded', () => {
-                    updateMeasurementLabel(layer);
-                });
+            // Evento cuando se empieza a dibujar: solo actualiza en tiempo real para las LÍNEAS.
+            map.on('pm:drawstart', ({ workingLayer, shape }) => {
+                if (shape === 'Line') {
+                    workingLayer.on('pm:vertexadded', () => {
+                        updateMeasurementLabel(workingLayer);
+                    });
+                }
             });
 
-            // Evento cuando se termina de dibujar una forma
+            // Evento cuando se termina de dibujar una forma: calcula la medida final y la añade a nuestro grupo de dibujos.
             map.on('pm:create', (e) => {
+                drawingsGroup.addLayer(e.layer); // ¡Clave! Añade la capa al grupo para poder borrarla.
                 updateMeasurementLabel(e.layer);
-                // Añadir un listener para que la medida se actualice si se edita la forma
                 e.layer.on('pm:edit', (ev) => updateMeasurementLabel(ev.layer));
             });
 
-            // Se activan las herramientas sin los tooltips por defecto, para usar los nuestros
             document.getElementById('measure-distance').addEventListener('click', () => map.pm.enableDraw('Line', { tooltips: false }));
             document.getElementById('measure-area').addEventListener('click', () => map.pm.enableDraw('Polygon', { tooltips: false }));
-            // ===== MODIFICACIÓN FIN: Lógica de medición y borrado mejorada =====
-
-
+            
             document.getElementById('mark-coords').addEventListener('click', function() {
                 L.DomUtil.addClass(map._container, 'leaflet-crosshair');
                 map.once('click', function(e) {
                     L.DomUtil.removeClass(map._container, 'leaflet-crosshair');
                     const { lat, lng } = e.latlng;
-                    // Los marcadores simples se añaden al grupo de capas de usuario para poder borrarlos
-                    const marker = L.marker(e.latlng).addTo(userLoadedLayersGroup);
+                    // Añade el marcador al grupo de dibujos para que se pueda borrar.
+                    const marker = L.marker(e.latlng).addTo(drawingsGroup);
                     marker.bindPopup(`<b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lng.toFixed(6)}`).openPopup();
                 });
             });
@@ -512,8 +516,8 @@
             function createBufferOnClick(e) {
                 const radius = prompt("Ingrese el radio del buffer en metros:", "100");
                 if (radius && !isNaN(parseFloat(radius))) {
-                    // El buffer también es una capa de Geoman, se borrará correctamente con el nuevo método
-                    const bufferCircle = L.circle(e.latlng, { radius: parseFloat(radius) }).addTo(map);
+                    // Añade el buffer al grupo de dibujos para que se pueda borrar.
+                    L.circle(e.latlng, { radius: parseFloat(radius) }).addTo(drawingsGroup);
                 } else if (radius !== null) {
                     alert("Por favor, ingrese un número válido.");
                 }
@@ -522,6 +526,14 @@
                 L.DomUtil.removeClass(map._container, 'leaflet-help');
                 map.off('click', createBufferOnClick);
             }
+
+            // El botón de limpiar ahora simplemente vacía nuestro grupo de dibujos.
+            document.getElementById('clear-drawings').addEventListener('click', () => {
+                drawingsGroup.clearLayers();
+                userLoadedLayersGroup.clearLayers(); // También limpia capas cargadas por si acaso
+                alert("Se han limpiado todos los dibujos y capas temporales.");
+            });
+            // ===== MODIFICACIÓN FIN =====
 
             document.getElementById('transform-coords').addEventListener('click', () => {
                 const analysisPanel = document.getElementById('analysis-panel');
@@ -551,19 +563,7 @@
                 }
                 document.getElementById('coord-result').innerHTML = result;
             });
-
-            // ===== MODIFICACIÓN INICIO: Lógica de borrado robusta =====
-            document.getElementById('clear-drawings').addEventListener('click', () => {
-                // Usamos el método de Geoman para obtener TODAS las capas que ha dibujado (líneas, polígonos, círculos, etc.)
-                map.pm.getGeomanLayers().forEach(layer => {
-                    layer.remove();
-                });
-                // También limpiamos las capas cargadas por el usuario (KML/GeoJSON) y los marcadores de coordenadas
-                userLoadedLayersGroup.clearLayers();
-                alert("Se han limpiado todos los dibujos y capas temporales.");
-            });
-            // ===== MODIFICACIÓN FIN: Lógica de borrado robusta =====
-
+            
             document.getElementById('print-map').addEventListener('click', () => {
                 alert("Se generará una imagen del mapa. Este proceso puede tardar unos segundos.");
                 const elementsToHide = '.custom-panel, .leaflet-control-container';
@@ -649,8 +649,8 @@
                 }
                 const latlng = L.latLng(lat, lon);
                 map.flyTo(latlng, 17);
-                // Marcador simple se añade al grupo de capas de usuario
-                L.marker(latlng, { title: `(${lat.toFixed(5)}, ${lon.toFixed(5)})` }).addTo(userLoadedLayersGroup);
+                // Marcador simple se añade al grupo de dibujos para ser borrado
+                L.marker(latlng, { title: `(${lat.toFixed(5)}, ${lon.toFixed(5)})` }).addTo(drawingsGroup);
             });
 
             const infoParcelaBtn = document.getElementById('info-parcela');
