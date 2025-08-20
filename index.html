@@ -308,7 +308,6 @@
             function makeFeatureSelectable(layer) { const selStyle = { color: '#ffff00', weight: 5, fillOpacity: 0.5 }; layer.originalStyle = JSON.parse(JSON.stringify(layer.options.style || {})); layer.on('click', function(e) { L.DomEvent.stopPropagation(e); const index = seleccionActual.indexOf(layer); if (index > -1) { seleccionActual.splice(index, 1); layer.setStyle(layer.originalStyle); } else { seleccionActual.push(layer); layer.setStyle(selStyle); } document.getElementById('selected-count').textContent = seleccionActual.length; }); }
             function makePointSelectable(marker) { marker.originalIcon = marker.getIcon(); marker.on('click', function(e) { L.DomEvent.stopPropagation(e); const index = seleccionActual.indexOf(marker); if (index > -1) { seleccionActual.splice(index, 1); marker.setIcon(marker.originalIcon); } else { seleccionActual.push(marker); marker.setIcon(selectedIcon); } document.getElementById('selected-count').textContent = seleccionActual.length; }); }
             
-            // ===== MODIFICACIÓN INICIO: Se elimina el grupo 'drawingsGroup' ya que usaremos el método de Geoman =====
             const userLoadedLayersGroup = L.layerGroup().addTo(map);
 
             async function loadDynamicLayers() { 
@@ -464,7 +463,7 @@
                 }
             };
             
-            // Evento cuando se empieza a dibujar
+            // Evento cuando se empieza a dibujar para actualizar la medida en tiempo real
             map.on('pm:drawstart', (e) => {
                 const layer = e.workingLayer;
                 layer.on('pm:vertexadded', () => {
@@ -472,10 +471,10 @@
                 });
             });
 
-            // Evento cuando se termina de dibujar
+            // Evento cuando se termina de dibujar una forma
             map.on('pm:create', (e) => {
                 updateMeasurementLabel(e.layer);
-                // Añadir listener para actualizar al editar
+                // Añadir un listener para que la medida se actualice si se edita la forma
                 e.layer.on('pm:edit', (ev) => updateMeasurementLabel(ev.layer));
             });
 
@@ -490,7 +489,7 @@
                 map.once('click', function(e) {
                     L.DomUtil.removeClass(map._container, 'leaflet-crosshair');
                     const { lat, lng } = e.latlng;
-                    // Los marcadores simples no necesitan estar en el grupo de Geoman
+                    // Los marcadores simples se añaden al grupo de capas de usuario para poder borrarlos
                     const marker = L.marker(e.latlng).addTo(userLoadedLayersGroup);
                     marker.bindPopup(`<b>Lat:</b> ${lat.toFixed(6)}<br><b>Lon:</b> ${lng.toFixed(6)}`).openPopup();
                 });
@@ -513,7 +512,7 @@
             function createBufferOnClick(e) {
                 const radius = prompt("Ingrese el radio del buffer en metros:", "100");
                 if (radius && !isNaN(parseFloat(radius))) {
-                    // El buffer también es una capa de Geoman, se borrará correctamente
+                    // El buffer también es una capa de Geoman, se borrará correctamente con el nuevo método
                     const bufferCircle = L.circle(e.latlng, { radius: parseFloat(radius) }).addTo(map);
                 } else if (radius !== null) {
                     alert("Por favor, ingrese un número válido.");
@@ -555,11 +554,11 @@
 
             // ===== MODIFICACIÓN INICIO: Lógica de borrado robusta =====
             document.getElementById('clear-drawings').addEventListener('click', () => {
-                // Se usa el método de Geoman para obtener TODAS las capas dibujadas
+                // Usamos el método de Geoman para obtener TODAS las capas que ha dibujado (líneas, polígonos, círculos, etc.)
                 map.pm.getGeomanLayers().forEach(layer => {
                     layer.remove();
                 });
-                // También se limpian las capas cargadas por el usuario y marcadores
+                // También limpiamos las capas cargadas por el usuario (KML/GeoJSON) y los marcadores de coordenadas
                 userLoadedLayersGroup.clearLayers();
                 alert("Se han limpiado todos los dibujos y capas temporales.");
             });
