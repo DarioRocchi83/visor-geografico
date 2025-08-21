@@ -270,7 +270,7 @@
                 "Topográfico": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap' }) 
             };
             
-            const wmsCatastroUrl = 'https://idecor-ws.mapascordoba.gob.ar/geoserver/idecor/wms';
+            const wmsCatastroUrl = 'https://geoservicios.idecor.gob.ar/geoserver/idecor/wms';
             const catastroLayer = L.tileLayer.wms(wmsCatastroUrl, {
                 layers: 'idecor:parcelas',
                 format: 'image/png',
