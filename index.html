@@ -91,7 +91,20 @@
         .coordinate-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         
         /* Leaflet Custom Controls */
-        .leaflet-tooltip-permanent { background-color: rgba(0, 0, 0, 0.85); color: white; border: none; padding: 8px 12px; font-weight: bold; border-radius: 6px; font-size: 14px; line-height: 1.4; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        /* Estilo mejorado para la etiqueta de medición */
+        .measurement-tooltip {
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #2c3e50;
+            border: 1px solid #3498db;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: left;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            pointer-events: none; /* Permite hacer clic a través de la etiqueta */
+        }
         .element-counter { font-size: 13px; color: #666; text-align: center; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; }
         .leaflet-control-north { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); }
         .leaflet-control-north img { width: 32px; height: 40px; }
@@ -347,7 +360,7 @@
             map.pm.addControls({ position: 'topleft', drawMarker: false, drawCircleMarker: false, drawPolyline: false, drawRectangle: false, drawPolygon: false, drawCircle: false, drawText: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false });
             map.pm.setLang('es');
             
-            L.Control.North = L.Control.extend({ onAdd: function(map) { const c = L.DomUtil.create('div', 'leaflet-control-north'); c.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA1MCI+PHBhdGggZD0iTTIwIDAgTDAgMzUgTDIwIDI4IEw0MCAzNSBaIiBmaWxsPSJibGFjayIvPjx0ZXh0IHg9IjIwIiB5PSI0OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5OPC90ZXh0Pjwvc3ZnPg=="></img>'; return c; } });
+            L.Control.North = L.Control.extend({ onAdd: function(map) { const c = L.DomUtil.create('div', 'leaflet-control-north'); c.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA1MCI+PHBhdGggZD0iTTIwIDAgTDAgMzUgTDIwIDI4IEw0MCAzNSBaIiBmaWxsPSJibGFjayIvPjx0ZXh0IHg9IjIwIiB5PSI0OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5OPC90ZXh0Pjwvc3ZnPg=="></img>'; return c; } });
             new L.Control.North({ position: 'topright' }).addTo(map);
 
             // --- GESTIÓN DE ICONOS Y ESTILOS ---
@@ -498,10 +511,11 @@
 
             // --- HERRAMIENTAS GIS ---
             
-            // 1. Medición de Área y Perímetro (CORREGIDO)
+            // 1. Medición de Área y Perímetro (CORREGIDO Y PERSISTENTE)
             let areaToolActive = false;
             let areaPolygon = null;
             let areaVertices = [];
+            let areaTooltipLayer = null; // Variable para la etiqueta flotante independiente
 
             document.getElementById('measure-area').addEventListener('click', function() {
                 areaToolActive = !areaToolActive;
@@ -509,9 +523,13 @@
                     this.classList.add('active-tool');
                     L.DomUtil.addClass(map._container, 'leaflet-crosshair');
                     map.on('click', addAreaVertex);
+                    
+                    // Limpiar todo al iniciar
                     if (areaPolygon) { map.removeLayer(areaPolygon); areaPolygon = null; }
+                    if (areaTooltipLayer) { map.removeLayer(areaTooltipLayer); areaTooltipLayer = null; }
                     areaVertices = [];
-                    alert('Haga clic en el mapa para dibujar. \nEl resultado aparecerá en la etiqueta central.');
+                    
+                    alert('Haga clic en el mapa para dibujar.\nEl resultado aparecerá en el centro del dibujo.');
                 } else {
                     resetAreaTool();
                 }
@@ -524,8 +542,10 @@
                 map.off('click', addAreaVertex);
                 map.off('dblclick', finishArea);
                 map.off('contextmenu', finishArea);
-                // No borramos el polígono al terminar para que el usuario vea el resultado
+                
+                // Limpiar datos
                 areaVertices = [];
+                // NOTA: No eliminamos areaPolygon ni areaTooltipLayer aquí para que el usuario vea el resultado final
             }
 
             function calculatePerimeter(pts) {
@@ -542,6 +562,8 @@
 
             function addAreaVertex(e) {
                 areaVertices.push(e.latlng);
+                
+                // Redibujar polígono
                 if (areaPolygon) map.removeLayer(areaPolygon);
                 
                 if (areaVertices.length >= 2) {
@@ -552,12 +574,14 @@
                         weight: 3 
                     }).addTo(map);
                     
+                    // Calcular y mostrar etiqueta separada del polígono
                     if (areaVertices.length >= 3) {
                         // Cálculos
                         const area = L.GeometryUtil.geodesicArea(areaVertices);
                         const perimeter = calculatePerimeter(areaVertices);
+                        const center = areaPolygon.getBounds().getCenter();
 
-                        // Textos
+                        // Formato de texto
                         const areaText = area > 10000 ? 
                             `${(area / 10000).toFixed(2)} ha` : 
                             `${area.toFixed(0)} m²`;
@@ -567,22 +591,27 @@
                             `${perimeter.toFixed(0)} m`;
 
                         const content = `
-                            <div style="text-align:left;">
+                            <div>
                                 <b>Área:</b> ${areaText}<br>
                                 <b>Perímetro:</b> ${perimText}
                             </div>
                         `;
 
-                        // Forzar visualización
-                        if (areaPolygon.getTooltip()) {
-                            areaPolygon.setTooltipContent(content);
+                        // Crear o actualizar el tooltip independiente
+                        if (!areaTooltipLayer) {
+                            areaTooltipLayer = L.tooltip({
+                                permanent: true,
+                                direction: 'center',
+                                className: 'measurement-tooltip'
+                            })
+                            .setLatLng(center)
+                            .setContent(content)
+                            .addTo(map);
                         } else {
-                            areaPolygon.bindTooltip(content, { 
-                                permanent: true, 
-                                direction: 'center', 
-                                className: 'leaflet-tooltip-permanent' 
-                            }).openTooltip();
+                            areaTooltipLayer.setLatLng(center).setContent(content);
                         }
+                        // Asegurar que la etiqueta esté encima
+                        areaTooltipLayer.bringToFront();
                     }
                 }
                 
@@ -596,7 +625,6 @@
             function finishArea(e) { 
                 if (e) {
                     e.originalEvent.preventDefault();
-                    // Si fue por click, añadimos el último punto antes de cerrar si es diferente
                 }
                 resetAreaTool(); 
             }
@@ -609,7 +637,7 @@
                     let dist = 0; const latlngs = layer.getLatLngs();
                     if(L.Util.isArray(latlngs) && latlngs.length > 1) for(let i = 1; i < latlngs.length; i++) dist += latlngs[i-1].distanceTo(latlngs[i]);
                     const text = dist > 1000 ? `Distancia: ${(dist/1000).toFixed(2)} km` : `Distancia: ${dist.toFixed(0)} m`;
-                    layer.bindTooltip(text, { permanent: true, className: 'leaflet-tooltip-permanent', direction: 'center' }).openTooltip();
+                    layer.bindTooltip(text, { permanent: true, className: 'measurement-tooltip', direction: 'center' }).openTooltip();
                 }
             }
 
@@ -759,7 +787,15 @@
             infoParcelaBtn.addEventListener('click', toggleInfoParcela);
 
             // Utilidades de Botones Generales
-            document.getElementById('clear-drawings').addEventListener('click', () => { map.pm.getGeomanLayers().forEach(layer => layer.remove()); userLoadedLayersGroup.clearLayers(); });
+            document.getElementById('clear-drawings').addEventListener('click', () => { 
+                map.pm.getGeomanLayers().forEach(layer => layer.remove()); 
+                userLoadedLayersGroup.clearLayers(); 
+                // Limpiar también herramientas manuales
+                if (areaPolygon) map.removeLayer(areaPolygon);
+                if (areaTooltipLayer) map.removeLayer(areaTooltipLayer);
+                areaPolygon = null;
+                areaTooltipLayer = null;
+            });
             document.getElementById('descargarSeleccion').addEventListener('click', () => { 
                 if (seleccionActual.length === 0) return alert("Nada seleccionado."); 
                 const kml = tokml(L.featureGroup(seleccionActual).toGeoJSON()); 
