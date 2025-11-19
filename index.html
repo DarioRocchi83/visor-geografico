@@ -405,7 +405,14 @@
                     const response = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data`);
                     if (!response.ok) { throw new Error(`Error de red: ${response.statusText}`); }
                     const files = (await response.json()).filter(f => f.name.endsWith('.geojson') || f.name.endsWith('.xlsx'));
-                    for (const [i, file] of files.entries()) { 
+                    
+                    // FILTRAR SOLO CAPAS DE VISADOS
+                    const visadosFiles = files.filter(file => 
+                        file.name.toLowerCase().includes('visados') || 
+                        file.name.toLowerCase().includes('visado')
+                    );
+                    
+                    for (const [i, file] of visadosFiles.entries()) { 
                         const layerName = file.name.split('.')[0];
                         document.getElementById('layer-filter').innerHTML += `<option value="${layerName}">${layerName}</option>`; 
                         document.getElementById('layer-icon-selector').innerHTML += `<option value="${layerName}">${layerName}</option>`;
@@ -415,6 +422,13 @@
                         } catch (layerError) {
                             const errorDiv = document.createElement('div'); errorDiv.className = 'layer-load-error'; errorDiv.textContent = `Error al cargar ${file.name}: ${layerError.message}`; document.getElementById('tools-panel').appendChild(errorDiv);
                         }
+                    }
+                    
+                    // Mostrar mensaje si no hay capas de visados
+                    if (visadosFiles.length === 0) {
+                        console.log("No se encontraron capas de VISADOS en el repositorio");
+                    } else {
+                        console.log(`Se cargaron ${visadosFiles.length} capas de VISADOS`);
                     }
                 } catch (error) { console.error("Error al cargar capas:", error); alert("No se pudo conectar con GitHub. Verifique el repositorio."); } 
             }
