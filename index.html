@@ -406,53 +406,48 @@
                     if (!response.ok) { throw new Error(`Error de red: ${response.statusText}`); }
                     const files = (await response.json()).filter(f => f.name.endsWith('.geojson') || f.name.endsWith('.xlsx'));
                     
-                    // FILTRAR SOLO CAPAS DE VISADOS
-                    const visadosFiles = files.filter(file => 
-                        file.name.toLowerCase().includes('visados') || 
-                        file.name.toLowerCase().includes('visado')
-                    );
-                    
-                    for (const [i, file] of visadosFiles.entries()) { 
+                    for (const [i, file] of files.entries()) { 
                         const layerName = file.name.split('.')[0];
                         document.getElementById('layer-filter').innerHTML += `<option value="${layerName}">${layerName}</option>`; 
                         document.getElementById('layer-icon-selector').innerHTML += `<option value="${layerName}">${layerName}</option>`;
                         try {
-                            if (file.name.endsWith('.geojson')) { await loadGeoJSONLayer(file, i); }
-                            else if (file.name.endsWith('.xlsx')) { await loadXLSXLayer(file, i); }
+                            if (file.name.endsWith('.geojson')) { 
+                                // Para GeoJSON, pasar si es capa de visados para mostrar contador
+                                const isVisadosLayer = file.name.toLowerCase().includes('visados');
+                                await loadGeoJSONLayer(file, i, isVisadosLayer); 
+                            }
+                            else if (file.name.endsWith('.xlsx')) { 
+                                // Para Excel, pasar si es capa de visados para mostrar contador
+                                const isVisadosLayer = file.name.toLowerCase().includes('visados');
+                                await loadXLSXLayer(file, i, isVisadosLayer); 
+                            }
                         } catch (layerError) {
                             const errorDiv = document.createElement('div'); errorDiv.className = 'layer-load-error'; errorDiv.textContent = `Error al cargar ${file.name}: ${layerError.message}`; document.getElementById('tools-panel').appendChild(errorDiv);
                         }
                     }
-                    
-                    // Mostrar mensaje si no hay capas de visados
-                    if (visadosFiles.length === 0) {
-                        console.log("No se encontraron capas de VISADOS en el repositorio");
-                    } else {
-                        console.log(`Se cargaron ${visadosFiles.length} capas de VISADOS`);
-                    }
                 } catch (error) { console.error("Error al cargar capas:", error); alert("No se pudo conectar con GitHub. Verifique el repositorio."); } 
             }
 
-            async function loadGeoJSONLayer(file, index) { 
+            async function loadGeoJSONLayer(file, index, showCounter = false) { 
                 const layerName = file.name.replace('.geojson', ''); 
                 const color = POINT_COLORS[index % POINT_COLORS.length]; 
                 layerFields[layerName] = new Set();
                 
-                // CONTADOR DE ELEMENTOS
+                // CONTADOR DE ELEMENTOS (solo para capas de visados)
                 let elementCount = 0;
                 
                 const geojsonLayer = L.geoJson(null, { 
                     style: { color, weight: 3 }, 
                     pointToLayer: (feat, ll) => {
-                        // INCREMENTAR CONTADOR PARA PUNTOS
-                        elementCount++;
+                        // INCREMENTAR CONTADOR PARA PUNTOS (solo si es capa de visados)
+                        if (showCounter) elementCount++;
                         return L.marker(ll, { icon: createCustomIcon(layerName, color) });
                     }, 
                     onEachFeature: (feat, layer) => { 
                         if (!feat.properties) return;
                         
-                        // INCREMENTAR CONTADOR PARA LÍNEAS Y POLÍGONOS
-                        if (feat.geometry.type !== 'Point') {
+                        // INCREMENTAR CONTADOR PARA LÍNEAS Y POLÍGONOS (solo si es capa de visados)
+                        if (showCounter && feat.geometry.type !== 'Point') {
                             elementCount++;
                         }
                         
@@ -471,24 +466,30 @@
                 const data = await response.json();
                 geojsonLayer.addData(data);
                 
-                // AGREGAR CAPA CON CONTADOR
-                layersControl.addOverlay(geojsonLayer, `${layerName} <span class="layer-counter">${elementCount}</span>`);
+                // AGREGAR CAPA CON CONTADOR SOLO SI ES VISADOS
+                const layerDisplayName = showCounter ? 
+                    `${layerName} <span class="layer-counter">${elementCount}</span>` : 
+                    layerName;
+                
+                layersControl.addOverlay(geojsonLayer, layerDisplayName);
                 
                 // Actualizar contador total
                 updateTotalCount();
                 
                 // Mostrar en consola para debug
-                console.log(`Capa ${layerName} cargada con ${elementCount} elementos`);
+                if (showCounter) {
+                    console.log(`Capa ${layerName} cargada con ${elementCount} elementos`);
+                }
             }
 
-            async function loadXLSXLayer(file, index) { 
+            async function loadXLSXLayer(file, index, showCounter = false) { 
                 const layerName = file.name.replace('.xlsx', ''); 
                 const color = POINT_COLORS[index % POINT_COLORS.length]; 
                 layerFields[layerName] = new Set(); 
                 const group = L.layerGroup(); 
                 mainLayerGroups[layerName] = group; 
                 
-                // CONTADOR DE ELEMENTOS
+                // CONTADOR DE ELEMENTOS (solo para capas de visados)
                 let elementCount = 0;
                 
                 const response = await fetch(file.download_url);
@@ -507,8 +508,8 @@
                     const lon = parseFloat(String(p.Longitud).replace(',', '.'));
                     if (isNaN(lat) || isNaN(lon)) return;
                     
-                    // INCREMENTAR CONTADOR
-                    elementCount++;
+                    // INCREMENTAR CONTADOR (solo si es capa de visados)
+                    if (showCounter) elementCount++;
                     
                     Object.keys(p).forEach(k => layerFields[layerName].add(k)); 
                     let pop = `<b>${layerName}</b><hr>`; 
@@ -520,14 +521,20 @@
                     allFeatures.push(marker);
                 });
                 
-                // AGREGAR CAPA CON CONTADOR
-                layersControl.addOverlay(group, `${layerName} <span class="layer-counter">${elementCount}</span>`);
+                // AGREGAR CAPA CON CONTADOR SOLO SI ES VISADOS
+                const layerDisplayName = showCounter ? 
+                    `${layerName} <span class="layer-counter">${elementCount}</span>` : 
+                    layerName;
+                
+                layersControl.addOverlay(group, layerDisplayName);
                 
                 // Actualizar contador total
                 updateTotalCount();
                 
                 // Mostrar en consola para debug
-                console.log(`Capa ${layerName} cargada con ${elementCount} elementos`);
+                if (showCounter) {
+                    console.log(`Capa ${layerName} cargada con ${elementCount} elementos`);
+                }
             }
 
             // --- EDITOR DE ICONOS UI ---
