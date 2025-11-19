@@ -91,7 +91,6 @@
         .coordinate-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         
         /* Leaflet Custom Controls */
-        /* Estilo mejorado para la etiqueta de medición */
         .measurement-tooltip {
             background-color: rgba(255, 255, 255, 0.95);
             color: #2c3e50;
@@ -103,9 +102,18 @@
             line-height: 1.4;
             text-align: left;
             box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-            pointer-events: none; /* Permite hacer clic a través de la etiqueta */
+            pointer-events: none;
         }
         .element-counter { font-size: 13px; color: #666; text-align: center; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; }
+        .layer-counter {
+            font-size: 11px;
+            color: #666;
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            border: 1px solid #dee2e6;
+        }
         .leaflet-control-north { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); }
         .leaflet-control-north img { width: 32px; height: 40px; }
         .layer-load-error { color: #e74c3c; font-size: 12px; padding: 5px; margin-top: 5px; background: #f8d7da; border-radius: 4px; }
@@ -162,7 +170,10 @@
                     <div class="filter-group"><label class="filter-label">Capa:</label><select id="layer-filter"><option value="">Todas las capas</option></select></div>
                     <div class="filter-group"><label class="filter-label">Campo:</label><select id="field-filter"><option value="">Todos los campos</option></select></div>
                 </div>
-                <div class="element-counter">Seleccionados: <span id="selected-count">0</span></div>
+                <div class="element-counter">
+                    Seleccionados: <span id="selected-count">0</span> | 
+                    Total elementos: <span id="total-count">0</span>
+                </div>
                 <button id="descargarSeleccion"><i class="fas fa-download"></i> Descargar Selección (KML)</button>
                 <button id="limpiarSeleccion"><i class="fas fa-broom"></i> Limpiar Selección</button>
                 
@@ -375,6 +386,17 @@
             function makeFeatureSelectable(layer) { const selStyle = { color: '#ffff00', weight: 5, fillOpacity: 0.5 }; layer.originalStyle = JSON.parse(JSON.stringify(layer.options.style || {})); layer.on('click', function(e) { L.DomEvent.stopPropagation(e); const index = seleccionActual.indexOf(layer); if (index > -1) { seleccionActual.splice(index, 1); layer.setStyle(layer.originalStyle); } else { seleccionActual.push(layer); layer.setStyle(selStyle); } document.getElementById('selected-count').textContent = seleccionActual.length; }); }
             function makePointSelectable(marker) { marker.originalIcon = marker.getIcon(); marker.on('click', function(e) { L.DomEvent.stopPropagation(e); const index = seleccionActual.indexOf(marker); if (index > -1) { seleccionActual.splice(index, 1); marker.setIcon(marker.originalIcon); } else { seleccionActual.push(marker); marker.setIcon(selectedIcon); } document.getElementById('selected-count').textContent = seleccionActual.length; }); }
 
+            // --- FUNCIÓN PARA ACTUALIZAR CONTADOR TOTAL ---
+            function updateTotalCount() {
+                let total = 0;
+                Object.values(mainLayerGroups).forEach(layerGroup => {
+                    if (layerGroup.getLayers) {
+                        total += layerGroup.getLayers().length;
+                    }
+                });
+                document.getElementById('total-count').textContent = total;
+            }
+
             // --- CARGA DE DATOS (GITHUB) ---
             const userLoadedLayersGroup = L.layerGroup().addTo(map);
 
@@ -401,11 +423,25 @@
                 const layerName = file.name.replace('.geojson', ''); 
                 const color = POINT_COLORS[index % POINT_COLORS.length]; 
                 layerFields[layerName] = new Set();
+                
+                // CONTADOR DE ELEMENTOS
+                let elementCount = 0;
+                
                 const geojsonLayer = L.geoJson(null, { 
                     style: { color, weight: 3 }, 
-                    pointToLayer: (feat, ll) => L.marker(ll, { icon: createCustomIcon(layerName, color) }), 
+                    pointToLayer: (feat, ll) => {
+                        // INCREMENTAR CONTADOR PARA PUNTOS
+                        elementCount++;
+                        return L.marker(ll, { icon: createCustomIcon(layerName, color) });
+                    }, 
                     onEachFeature: (feat, layer) => { 
                         if (!feat.properties) return;
+                        
+                        // INCREMENTAR CONTADOR PARA LÍNEAS Y POLÍGONOS
+                        if (feat.geometry.type !== 'Point') {
+                            elementCount++;
+                        }
+                        
                         layer.featureData = { ...feat.properties, _layerName: layerName }; 
                         Object.keys(feat.properties).forEach(k => layerFields[layerName].add(k)); 
                         let pop = `<h4>${layerName}</h4><hr>`; 
@@ -416,11 +452,19 @@
                     } 
                 }); 
                 mainLayerGroups[layerName] = geojsonLayer; 
-                layersControl.addOverlay(geojsonLayer, layerName); 
                 
                 const response = await fetch(file.download_url);
                 const data = await response.json();
                 geojsonLayer.addData(data);
+                
+                // AGREGAR CAPA CON CONTADOR
+                layersControl.addOverlay(geojsonLayer, `${layerName} <span class="layer-counter">${elementCount}</span>`);
+                
+                // Actualizar contador total
+                updateTotalCount();
+                
+                // Mostrar en consola para debug
+                console.log(`Capa ${layerName} cargada con ${elementCount} elementos`);
             }
 
             async function loadXLSXLayer(file, index) { 
@@ -429,7 +473,9 @@
                 layerFields[layerName] = new Set(); 
                 const group = L.layerGroup(); 
                 mainLayerGroups[layerName] = group; 
-                layersControl.addOverlay(group, layerName);
+                
+                // CONTADOR DE ELEMENTOS
+                let elementCount = 0;
                 
                 const response = await fetch(file.download_url);
                 const arrayBuffer = await response.arrayBuffer();
@@ -438,11 +484,18 @@
                 const data = XLSX.utils.sheet_to_json(workbook.Sheets['Hoja1']);
                 
                 data.forEach(p => {
-                    if (p.hasOwnProperty('Nomenclatura Oficial')) { p['Antecedente Dominial'] = p['Nomenclatura Oficial']; delete p['Nomenclatura Oficial']; }
+                    if (p.hasOwnProperty('Nomenclatura Oficial')) { 
+                        p['Antecedente Dominial'] = p['Nomenclatura Oficial']; 
+                        delete p['Nomenclatura Oficial']; 
+                    }
                     if (!p.Latitud || !p.Longitud) return;
                     const lat = parseFloat(String(p.Latitud).replace(',', '.'));
                     const lon = parseFloat(String(p.Longitud).replace(',', '.'));
                     if (isNaN(lat) || isNaN(lon)) return;
+                    
+                    // INCREMENTAR CONTADOR
+                    elementCount++;
+                    
                     Object.keys(p).forEach(k => layerFields[layerName].add(k)); 
                     let pop = `<b>${layerName}</b><hr>`; 
                     for(const k in p) { pop += `<b>${k}:</b> ${p[k] || 'N/A'}<br>`; }
@@ -452,6 +505,15 @@
                     group.addLayer(marker); 
                     allFeatures.push(marker);
                 });
+                
+                // AGREGAR CAPA CON CONTADOR
+                layersControl.addOverlay(group, `${layerName} <span class="layer-counter">${elementCount}</span>`);
+                
+                // Actualizar contador total
+                updateTotalCount();
+                
+                // Mostrar en consola para debug
+                console.log(`Capa ${layerName} cargada con ${elementCount} elementos`);
             }
 
             // --- EDITOR DE ICONOS UI ---
@@ -487,17 +549,31 @@
                 const txt = document.getElementById('buscador').value.toLowerCase().trim(); 
                 const lyr = document.getElementById('layer-filter').value; 
                 const fld = document.getElementById('field-filter').value; 
-                if (!txt) { Object.values(mainLayerGroups).forEach(g => { if (map.hasLayer(g)) g.addTo(map); }); return; } 
+                
+                if (!txt) { 
+                    Object.values(mainLayerGroups).forEach(g => { if (map.hasLayer(g)) g.addTo(map); }); 
+                    return; 
+                } 
+                
                 Object.values(mainLayerGroups).forEach(g => { if (map.hasLayer(g)) map.removeLayer(g); }); 
+                
+                let foundCount = 0;
                 allFeatures.forEach(f => { 
                     let data = f.featureData; 
                     if ((!lyr || data._layerName === lyr) && 
                         (!fld || (data[fld] && String(data[fld]).toLowerCase().includes(txt))) && 
                         (fld || Object.values(data).some(v => v && String(v).toLowerCase().includes(txt)))) {
                         searchResultsLayer.addLayer(f); 
+                        foundCount++;
                     }
                 }); 
-                if (searchResultsLayer.getLayers().length > 0) { map.fitBounds(searchResultsLayer.getBounds().pad(0.1)); }
+                
+                // Actualizar contador de búsqueda
+                document.getElementById('selected-count').textContent = foundCount;
+                
+                if (searchResultsLayer.getLayers().length > 0) { 
+                    map.fitBounds(searchResultsLayer.getBounds().pad(0.1)); 
+                }
             }
             document.getElementById('layer-filter').addEventListener('change', () => { 
                 const sel = document.getElementById('layer-filter').value; 
@@ -511,25 +587,37 @@
 
             // --- HERRAMIENTAS GIS ---
             
-            // 1. Medición de Área y Perímetro (CORREGIDO Y PERSISTENTE)
+            // 1. Medición de Área y Perímetro (VERSIÓN CORREGIDA)
             let areaToolActive = false;
             let areaPolygon = null;
             let areaVertices = [];
-            let areaTooltipLayer = null; // Variable para la etiqueta flotante independiente
+            let areaTooltipLayer = null;
 
             document.getElementById('measure-area').addEventListener('click', function() {
                 areaToolActive = !areaToolActive;
                 if (areaToolActive) {
+                    // Desactivar otras herramientas
+                    document.querySelectorAll('.gis-tool-btn').forEach(btn => btn.classList.remove('active-tool'));
                     this.classList.add('active-tool');
                     L.DomUtil.addClass(map._container, 'leaflet-crosshair');
-                    map.on('click', addAreaVertex);
                     
-                    // Limpiar todo al iniciar
-                    if (areaPolygon) { map.removeLayer(areaPolygon); areaPolygon = null; }
-                    if (areaTooltipLayer) { map.removeLayer(areaTooltipLayer); areaTooltipLayer = null; }
+                    // Limpiar mediciones anteriores
+                    if (areaPolygon) { 
+                        map.removeLayer(areaPolygon); 
+                        areaPolygon = null; 
+                    }
+                    if (areaTooltipLayer) { 
+                        map.removeLayer(areaTooltipLayer); 
+                        areaTooltipLayer = null; 
+                    }
                     areaVertices = [];
                     
-                    alert('Haga clic en el mapa para dibujar.\nEl resultado aparecerá en el centro del dibujo.');
+                    // Configurar eventos
+                    map.on('click', addAreaVertex);
+                    map.on('dblclick', finishArea);
+                    map.on('contextmenu', finishArea);
+                    
+                    alert('Haga clic en el mapa para dibujar el polígono.\nDoble clic o clic derecho para finalizar.');
                 } else {
                     resetAreaTool();
                 }
@@ -542,91 +630,154 @@
                 map.off('click', addAreaVertex);
                 map.off('dblclick', finishArea);
                 map.off('contextmenu', finishArea);
-                
-                // Limpiar datos
-                areaVertices = [];
-                // NOTA: No eliminamos areaPolygon ni areaTooltipLayer aquí para que el usuario vea el resultado final
             }
 
-            function calculatePerimeter(pts) {
-                let dist = 0;
-                for (let i = 0; i < pts.length - 1; i++) {
-                    dist += pts[i].distanceTo(pts[i+1]);
+            function calculatePerimeter(latlngs) {
+                let perimeter = 0;
+                for (let i = 0; i < latlngs.length; i++) {
+                    const current = latlngs[i];
+                    const next = latlngs[(i + 1) % latlngs.length];
+                    perimeter += current.distanceTo(next);
                 }
-                // Cerrar el polígono para el perímetro
-                if (pts.length > 2) {
-                    dist += pts[pts.length-1].distanceTo(pts[0]);
-                }
-                return dist;
+                return perimeter;
+            }
+
+            function calculateArea(latlngs) {
+                // Usar la función de área de Leaflet (más precisa)
+                const area = L.GeometryUtil.geodesicArea(latlngs);
+                return Math.abs(area); // Asegurar valor positivo
             }
 
             function addAreaVertex(e) {
                 areaVertices.push(e.latlng);
                 
                 // Redibujar polígono
-                if (areaPolygon) map.removeLayer(areaPolygon);
+                if (areaPolygon) {
+                    map.removeLayer(areaPolygon);
+                }
                 
                 if (areaVertices.length >= 2) {
+                    // Crear polígono temporal
                     areaPolygon = L.polygon(areaVertices, { 
-                        color: '#2980b9', 
-                        fillColor: '#3498db', 
-                        fillOpacity: 0.4, 
-                        weight: 3 
+                        color: '#e74c3c', 
+                        fillColor: '#e74c3c', 
+                        fillOpacity: 0.3, 
+                        weight: 3,
+                        dashArray: '5, 5'
                     }).addTo(map);
                     
-                    // Calcular y mostrar etiqueta separada del polígono
+                    // Calcular y mostrar resultados cuando hay al menos 3 puntos
                     if (areaVertices.length >= 3) {
-                        // Cálculos
-                        const area = L.GeometryUtil.geodesicArea(areaVertices);
+                        const area = calculateArea(areaVertices);
                         const perimeter = calculatePerimeter(areaVertices);
-                        const center = areaPolygon.getBounds().getCenter();
-
-                        // Formato de texto
-                        const areaText = area > 10000 ? 
-                            `${(area / 10000).toFixed(2)} ha` : 
-                            `${area.toFixed(0)} m²`;
+                        
+                        // Formatear resultados
+                        const areaText = area >= 10000 ? 
+                            `${(area / 10000).toFixed(2)} hectáreas` : 
+                            `${area.toFixed(1)} m²`;
                             
-                        const perimText = perimeter > 1000 ?
+                        const perimeterText = perimeter >= 1000 ?
                             `${(perimeter / 1000).toFixed(2)} km` :
-                            `${perimeter.toFixed(0)} m`;
+                            `${perimeter.toFixed(1)} m`;
 
                         const content = `
-                            <div>
-                                <b>Área:</b> ${areaText}<br>
-                                <b>Perímetro:</b> ${perimText}
+                            <div style="text-align: center; font-weight: bold;">
+                                <div style="color: #2c3e50;">ÁREA: ${areaText}</div>
+                                <div style="color: #34495e;">PERÍMETRO: ${perimeterText}</div>
+                                <div style="font-size: 10px; color: #7f8c8d; margin-top: 5px;">
+                                    (Doble clic para finalizar)
+                                </div>
                             </div>
                         `;
 
-                        // Crear o actualizar el tooltip independiente
+                        // Calcular centro del polígono para posicionar la etiqueta
+                        const bounds = areaPolygon.getBounds();
+                        const center = bounds.getCenter();
+
+                        // Crear o actualizar tooltip
                         if (!areaTooltipLayer) {
-                            areaTooltipLayer = L.tooltip({
-                                permanent: true,
-                                direction: 'center',
-                                className: 'measurement-tooltip'
-                            })
-                            .setLatLng(center)
-                            .setContent(content)
-                            .addTo(map);
+                            areaTooltipLayer = L.marker(center, {
+                                icon: L.divIcon({
+                                    html: content,
+                                    className: 'measurement-tooltip',
+                                    iconSize: [200, 80]
+                                }),
+                                zIndexOffset: 1000
+                            }).addTo(map);
                         } else {
-                            areaTooltipLayer.setLatLng(center).setContent(content);
+                            areaTooltipLayer.setLatLng(center);
+                            areaTooltipLayer.setIcon(L.divIcon({
+                                html: content,
+                                className: 'measurement-tooltip',
+                                iconSize: [200, 80]
+                            }));
                         }
-                        // Asegurar que la etiqueta esté encima
-                        areaTooltipLayer.bringToFront();
                     }
                 }
                 
-                // Listeners para finalizar
-                if (areaVertices.length >= 3) { 
-                    map.once('dblclick', finishArea); 
-                    map.once('contextmenu', finishArea); 
-                }
+                // Mostrar puntos de vértice
+                L.circleMarker(e.latlng, {
+                    radius: 4,
+                    color: '#e74c3c',
+                    fillColor: '#ffffff',
+                    fillOpacity: 1,
+                    weight: 2
+                }).addTo(map);
             }
 
-            function finishArea(e) { 
+            function finishArea(e) {
                 if (e) {
                     e.originalEvent.preventDefault();
                 }
-                resetAreaTool(); 
+                
+                if (areaVertices.length >= 3) {
+                    // Hacer el polígono permanente
+                    areaPolygon.setStyle({
+                        color: '#27ae60',
+                        fillColor: '#27ae60',
+                        fillOpacity: 0.4,
+                        weight: 3,
+                        dashArray: null
+                    });
+                    
+                    // Mostrar resultado final
+                    const area = calculateArea(areaVertices);
+                    const perimeter = calculatePerimeter(areaVertices);
+                    
+                    const areaText = area >= 10000 ? 
+                        `${(area / 10000).toFixed(2)} ha` : 
+                        `${area.toFixed(0)} m²`;
+                        
+                    const perimeterText = perimeter >= 1000 ?
+                        `${(perimeter / 1000).toFixed(2)} km` :
+                        `${perimeter.toFixed(0)} m`;
+
+                    const finalContent = `
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold; color: #27ae60;">MEDICIÓN FINAL</div>
+                            <div><b>Área:</b> ${areaText}</div>
+                            <div><b>Perímetro:</b> ${perimeterText}</div>
+                            <div><b>Vértices:</b> ${areaVertices.length}</div>
+                        </div>
+                    `;
+
+                    if (areaTooltipLayer) {
+                        areaTooltipLayer.setIcon(L.divIcon({
+                            html: finalContent,
+                            className: 'measurement-tooltip',
+                            iconSize: [180, 100]
+                        }));
+                    }
+                    
+                    // Agregar popup al polígono
+                    areaPolygon.bindPopup(finalContent);
+                    
+                    alert(`Medición completada:\nÁrea: ${areaText}\nPerímetro: ${perimeterText}`);
+                } else {
+                    alert('Se necesitan al menos 3 puntos para calcular área y perímetro.');
+                }
+                
+                resetAreaTool();
             }
 
             // 2. Medición de Distancia (Geoman)
@@ -790,11 +941,22 @@
             document.getElementById('clear-drawings').addEventListener('click', () => { 
                 map.pm.getGeomanLayers().forEach(layer => layer.remove()); 
                 userLoadedLayersGroup.clearLayers(); 
-                // Limpiar también herramientas manuales
-                if (areaPolygon) map.removeLayer(areaPolygon);
-                if (areaTooltipLayer) map.removeLayer(areaTooltipLayer);
-                areaPolygon = null;
-                areaTooltipLayer = null;
+                
+                // Limpiar herramienta de área
+                if (areaPolygon) {
+                    map.removeLayer(areaPolygon);
+                    areaPolygon = null;
+                }
+                if (areaTooltipLayer) {
+                    map.removeLayer(areaTooltipLayer);
+                    areaTooltipLayer = null;
+                }
+                areaVertices = [];
+                
+                // Resetear estado de la herramienta
+                areaToolActive = false;
+                document.getElementById('measure-area').classList.remove('active-tool');
+                L.DomUtil.removeClass(map._container, 'leaflet-crosshair');
             });
             document.getElementById('descargarSeleccion').addEventListener('click', () => { 
                 if (seleccionActual.length === 0) return alert("Nada seleccionado."); 
