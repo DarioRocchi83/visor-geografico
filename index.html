@@ -91,29 +91,9 @@
         .coordinate-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         
         /* Leaflet Custom Controls */
-        .measurement-tooltip {
-            background-color: rgba(255, 255, 255, 0.95);
-            color: #2c3e50;
-            border: 1px solid #3498db;
-            padding: 8px 12px;
-            font-weight: bold;
-            border-radius: 4px;
-            font-size: 13px;
-            line-height: 1.4;
-            text-align: left;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-            pointer-events: none;
-        }
+        .measurement-tooltip { background-color: rgba(255, 255, 255, 0.95); color: #2c3e50; border: 1px solid #3498db; padding: 8px 12px; font-weight: bold; border-radius: 4px; font-size: 13px; line-height: 1.4; text-align: left; box-shadow: 0 3px 8px rgba(0,0,0,0.3); pointer-events: none; }
         .element-counter { font-size: 13px; color: #666; text-align: center; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; }
-        .layer-counter {
-            font-size: 11px;
-            color: #666;
-            background: #f8f9fa;
-            padding: 2px 6px;
-            border-radius: 10px;
-            margin-left: 8px;
-            border: 1px solid #dee2e6;
-        }
+        .layer-counter { font-size: 11px; color: #666; background: #f8f9fa; padding: 2px 6px; border-radius: 10px; margin-left: 8px; border: 1px solid #dee2e6; }
         .leaflet-control-north { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); }
         .leaflet-control-north img { width: 32px; height: 40px; }
         .layer-load-error { color: #e74c3c; font-size: 12px; padding: 5px; margin-top: 5px; background: #f8d7da; border-radius: 4px; }
@@ -133,6 +113,33 @@
         .icon-editor { margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: #f8f9fa; }
         .icon-option { display: inline-block; width: 30px; height: 30px; margin: 5px; text-align: center; line-height: 30px; border: 2px solid transparent; border-radius: 50%; cursor: pointer; font-size: 14px; }
         .icon-option.selected { border-color: #3498db; background: #e3f2fd; }
+
+        /* --- NUEVOS ESTILOS PARA SELECCIÓN POR RELACIÓN --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .modal-content { background: white; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--primary-color); font-size: 14px; }
+        .form-select, .form-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white; }
+        .form-text { display: block; margin-top: 5px; font-size: 12px; color: #666; }
+        .btn-primary { background: linear-gradient(135deg, var(--secondary-color), #2980b9); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-secondary { background: #6c757d; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-danger { background: linear-gradient(135deg, var(--accent-color), #c0392b); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary:hover, .btn-secondary:hover, .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
+        
+        .relation-highlight { animation: highlight-pulse 2s infinite; }
+        @keyframes highlight-pulse { 
+            0% { stroke-width: 2; opacity: 0.8; } 
+            50% { stroke-width: 5; opacity: 1; } 
+            100% { stroke-width: 2; opacity: 0.8; } 
+        }
+        .relation-selected { stroke: #ff00ff !important; stroke-width: 4 !important; fill-opacity: 0.7 !important; animation: relation-selected-pulse 1.5s infinite; }
+        @keyframes relation-selected-pulse { 
+            0% { stroke: #ff00ff; } 
+            50% { stroke: #ff66ff; } 
+            100% { stroke: #ff00ff; } 
+        }
+        .reference-highlight { stroke: #00ff00 !important; stroke-width: 3 !important; fill-opacity: 0.3 !important; }
     </style>
 </head>
 <body>
@@ -205,6 +212,10 @@
                     <div class="gis-tool-btn" id="measure-area" title="Medir área y perímetro"><i class="fas fa-draw-polygon"></i>Área</div>
                     <div class="gis-tool-btn" id="mark-coords" title="Marcar coordenada"><i class="fas fa-map-marker-alt"></i>Coordenada</div>
                     <div class="gis-tool-btn" id="create-buffer" title="Crear Buffer"><i class="fas fa-bullseye"></i>Buffer</div>
+                    <!-- NUEVO BOTÓN AGREGADO -->
+                    <div class="gis-tool-btn" id="select-by-relation" title="Seleccionar por relación entre capas">
+                        <i class="fas fa-layer-group"></i>Selección por Relación
+                    </div>
                     <div class="gis-tool-btn" id="transform-coords" title="Transformar coordenadas"><i class="fas fa-exchange-alt"></i>Transformar</div>
                     <div class="gis-tool-btn" id="clear-drawings" title="Limpiar dibujos"><i class="fas fa-eraser"></i>Limpiar Dibujos</div>
                     <div class="gis-tool-btn" id="print-map" title="Imprimir mapa"><i class="fas fa-print"></i>Imprimir</div>
@@ -258,6 +269,91 @@
                     </div>
                     <button id="transform-btn"><i class="fas fa-sync-alt"></i> Transformar</button>
                     <div id="coord-result" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 6px; font-size: 13px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NUEVO MODAL DE SELECCIÓN POR RELACIÓN -->
+        <div id="relation-selector-modal" class="modal-overlay hidden">
+            <div class="modal-content custom-panel" style="width: 500px; max-height: 80vh; overflow-y: auto;">
+                <div class="panel-header">
+                    <h4 class="panel-title"><i class="fas fa-layer-group"></i> Selección por Relación Espacial</h4>
+                    <span class="close-modal" style="cursor: pointer; font-size: 1.5em;">&times;</span>
+                </div>
+                <div class="panel-content">
+                    <div class="analysis-section">
+                        <h5><i class="fas fa-cog"></i> Configuración de Capas</h5>
+                        
+                        <div class="form-group">
+                            <label>Capa Objetivo (a seleccionar):</label>
+                            <select id="target-layer-select" class="form-select">
+                                <option value="">Seleccione una capa...</option>
+                            </select>
+                            <small class="form-text">Elementos de esta capa serán seleccionados</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Capa Referencia (para comparar):</label>
+                            <select id="reference-layer-select" class="form-select">
+                                <option value="">Seleccione una capa...</option>
+                            </select>
+                            <small class="form-text">Se comparará contra esta capa</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tipo de Relación:</label>
+                            <select id="relation-type-select" class="form-select">
+                                <option value="intersects">INTERSECTA - Se tocan o superponen</option>
+                                <option value="contains">CONTENIDO DENTRO - Totalmente dentro de referencia</option>
+                                <option value="within">DENTRO DE - La referencia contiene al objetivo</option>
+                                <option value="disjoint">DISJUNTO - No se tocan</option>
+                                <option value="touches">TOCA - Comparte borde pero no interior</option>
+                                <option value="crosses">CRUZA - Atraviesa (línea-polígono)</option>
+                                <option value="overlaps">SUPERPONE - Mismo tipo, parcialmente superpuestos</option>
+                                <option value="near">PRÓXIMO - Dentro de distancia específica</option>
+                            </select>
+                        </div>
+
+                        <div id="distance-control" class="form-group hidden">
+                            <label>Distancia máxima (metros):</label>
+                            <input type="number" id="distance-input" class="form-input" value="100" min="1" max="10000">
+                            <small class="form-text">Distancia para relación "PRÓXIMO"</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Modo de Selección:</label>
+                            <select id="selection-mode" class="form-select">
+                                <option value="new">Nueva Selección (reemplazar)</option>
+                                <option value="add">Agregar a selección actual</option>
+                                <option value="remove">Remover de selección actual</option>
+                            </select>
+                        </div>
+
+                        <div class="stats-preview" style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin: 15px 0;">
+                            <h6><i class="fas fa-chart-bar"></i> Vista Previa</h6>
+                            <div id="preview-stats">Seleccione capas para ver estadísticas</div>
+                        </div>
+
+                        <div class="button-group" style="display: flex; gap: 10px;">
+                            <button id="preview-relation-btn" class="btn-secondary" style="flex: 1;">
+                                <i class="fas fa-eye"></i> Vista Previa
+                            </button>
+                            <button id="apply-relation-btn" class="btn-primary" style="flex: 2;">
+                                <i class="fas fa-check"></i> Aplicar Selección
+                            </button>
+                        </div>
+
+                        <button id="clear-relation-selection" class="btn-danger" style="width: 100%; margin-top: 10px;">
+                            <i class="fas fa-eraser"></i> Limpiar Selección por Relación
+                        </button>
+                    </div>
+
+                    <div class="analysis-section">
+                        <h5><i class="fas fa-info-circle"></i> Resultados</h5>
+                        <div id="relation-results" style="max-height: 200px; overflow-y: auto; padding: 10px; background: #f0f0f0; border-radius: 6px; font-size: 13px;">
+                            <!-- Resultados aparecerán aquí -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1010,6 +1106,416 @@
                 seleccionActual.forEach(l => l instanceof L.Marker ? l.setIcon(l.originalIcon) : l.setStyle(l.originalStyle)); 
                 seleccionActual = []; 
                 document.getElementById('selected-count').textContent = 0; 
+            });
+
+            // ==============================================================
+            // HERRAMIENTA DE SELECCIÓN POR RELACIÓN ESPACIAL (INTEGRADA)
+            // ==============================================================
+            
+            // Variables globales para esta funcionalidad
+            let relationHighlightLayers = [];
+            let relationSelectionGroup = L.featureGroup();
+
+            // 1. Configurar el botón para abrir el modal
+            document.getElementById('select-by-relation').addEventListener('click', () => {
+                openRelationSelector();
+            });
+
+            // 2. Función para abrir el modal de selección por relación
+            function openRelationSelector() {
+                // Actualizar dropdowns con capas disponibles
+                updateLayerDropdowns();
+                
+                // Mostrar modal
+                document.getElementById('relation-selector-modal').classList.remove('hidden');
+                
+                // Desplazar al usuario al panel de herramientas si está colapsado
+                const toolsPanel = document.getElementById('tools-panel');
+                if (toolsPanel.classList.contains('collapsed')) {
+                    toolsPanel.classList.remove('collapsed');
+                    toolsPanel.querySelector('.toggle-btn').textContent = '-';
+                }
+            }
+
+            // 3. Actualizar dropdowns con capas disponibles
+            function updateLayerDropdowns() {
+                const targetSelect = document.getElementById('target-layer-select');
+                const referenceSelect = document.getElementById('reference-layer-select');
+                
+                // Limpiar opciones
+                targetSelect.innerHTML = '<option value="">Seleccione una capa...</option>';
+                referenceSelect.innerHTML = '<option value="">Seleccione una capa...</option>';
+                
+                // Agregar capas del sistema
+                Object.keys(mainLayerGroups).forEach(layerName => {
+                    targetSelect.innerHTML += `<option value="${layerName}">${layerName}</option>`;
+                    referenceSelect.innerHTML += `<option value="${layerName}">${layerName}</option>`;
+                });
+                
+                // Agregar capas cargadas por el usuario
+                userLoadedLayersGroup.getLayers().forEach((layer, index) => {
+                    const name = `user_layer_${index}`;
+                    targetSelect.innerHTML += `<option value="${name}">Capa Usuario ${index + 1}</option>`;
+                    referenceSelect.innerHTML += `<option value="${name}">Capa Usuario ${index + 1}</option>`;
+                });
+            }
+
+            // 4. Mostrar/ocultar control de distancia según tipo de relación
+            document.getElementById('relation-type-select').addEventListener('change', function() {
+                const distanceControl = document.getElementById('distance-control');
+                distanceControl.classList.toggle('hidden', this.value !== 'near');
+            });
+
+            // 5. Función para obtener elementos de una capa
+            function getLayerElements(layerName) {
+                let elements = [];
+                
+                if (mainLayerGroups[layerName]) {
+                    const layerGroup = mainLayerGroups[layerName];
+                    if (layerGroup.getLayers) {
+                        elements = layerGroup.getLayers();
+                    }
+                } else if (layerName.startsWith('user_layer_')) {
+                    const index = parseInt(layerName.split('_')[2]);
+                    const userLayers = userLoadedLayersGroup.getLayers();
+                    if (userLayers[index]) {
+                        elements = [userLayers[index]]; 
+                        // Si es un featureGroup, obtener sus sub-capas
+                        if(userLayers[index].getLayers) {
+                            elements = userLayers[index].getLayers();
+                        }
+                    }
+                }
+                
+                return elements;
+            }
+
+            // 6. Función para verificar relación espacial
+            function checkSpatialRelation(element1, element2, relationType, distance = null) {
+                try {
+                    const geom1 = element1.toGeoJSON ? element1.toGeoJSON().geometry : null;
+                    const geom2 = element2.toGeoJSON ? element2.toGeoJSON().geometry : null;
+                    
+                    if (!geom1 || !geom2) return false;
+
+                    // Usar métodos Leaflet nativos para relaciones simples (bounding box)
+                    
+                    switch(relationType) {
+                        case 'intersects':
+                            if (element1.getBounds && element2.getBounds) {
+                                return element1.getBounds().intersects(element2.getBounds());
+                            } else if (element1.getLatLng && element2.getBounds) {
+                                return element2.getBounds().contains(element1.getLatLng());
+                            }
+                            break;
+                            
+                        case 'contains':
+                            if (element1.getBounds && element2.getBounds) {
+                                return element1.getBounds().contains(element2.getBounds());
+                            }
+                            break;
+                            
+                        case 'within':
+                             if (element1.getBounds && element2.getBounds) {
+                                return element2.getBounds().contains(element1.getBounds());
+                            }
+                            break;
+                            
+                        case 'disjoint':
+                            if (element1.getBounds && element2.getBounds) {
+                                return !element1.getBounds().intersects(element2.getBounds());
+                            }
+                            break;
+
+                        case 'near':
+                            if (!distance) return false;
+                            
+                            let center1, center2;
+                            
+                            if (element1.getBounds) center1 = element1.getBounds().getCenter();
+                            else if (element1.getLatLng) center1 = element1.getLatLng();
+                            
+                            if (element2.getBounds) center2 = element2.getBounds().getCenter();
+                            else if (element2.getLatLng) center2 = element2.getLatLng();
+                            
+                            if (center1 && center2) {
+                                const dist = center1.distanceTo(center2);
+                                return dist <= distance;
+                            }
+                            break;
+                            
+                        default:
+                            return false;
+                    }
+                } catch (error) {
+                    console.error('Error verificando relación:', error);
+                    return false;
+                }
+                return false;
+            }
+
+            // 7. Vista previa de la relación
+            document.getElementById('preview-relation-btn').addEventListener('click', function() {
+                previewSpatialRelation();
+            });
+
+            function previewSpatialRelation() {
+                const targetLayerName = document.getElementById('target-layer-select').value;
+                const referenceLayerName = document.getElementById('reference-layer-select').value;
+                const relationType = document.getElementById('relation-type-select').value;
+                const distance = relationType === 'near' ? parseFloat(document.getElementById('distance-input').value) : null;
+
+                if (!targetLayerName || !referenceLayerName) {
+                    alert('Por favor, seleccione ambas capas.');
+                    return;
+                }
+
+                // Limpiar highlights anteriores
+                clearRelationHighlights();
+
+                // Obtener elementos
+                const targetElements = getLayerElements(targetLayerName);
+                const referenceElements = getLayerElements(referenceLayerName);
+
+                if (targetElements.length === 0 || referenceElements.length === 0) {
+                    document.getElementById('preview-stats').innerHTML = 
+                        `<span style="color: #e74c3c;">Una o ambas capas no contienen elementos seleccionables.</span>`;
+                    return;
+                }
+                
+                // Resaltar elementos de referencia
+                referenceElements.forEach(element => {
+                     // Solo para propósitos visuales, creamos un geojson temporal
+                    if(element.toGeoJSON) {
+                        const highlightLayer = L.geoJson(element.toGeoJSON(), {
+                            style: {
+                                color: '#00ff00',
+                                weight: 3,
+                                fillOpacity: 0.3,
+                                className: 'reference-highlight'
+                            },
+                            pointToLayer: (feature, latlng) => {
+                                return L.circleMarker(latlng, {
+                                    radius: 8,
+                                    fillColor: "#00ff00",
+                                    color: "#000",
+                                    weight: 1,
+                                    opacity: 1,
+                                    fillOpacity: 0.8
+                                });
+                            }
+                        }).addTo(map);
+                        relationHighlightLayers.push(highlightLayer);
+                    }
+                });
+
+                // Calcular estadísticas (Muestra)
+                let matchCount = 0;
+                // Limitamos la comprobación para la vista previa para no congelar el navegador
+                const sampleChecks = Math.min(targetElements.length, 500); 
+
+                for (let i = 0; i < sampleChecks; i++) {
+                    const targetElement = targetElements[i];
+                    let matchesAny = false;
+
+                    for (const refElement of referenceElements) {
+                        if (checkSpatialRelation(targetElement, refElement, relationType, distance)) {
+                            matchesAny = true;
+                            break;
+                        }
+                    }
+                    if (matchesAny) matchCount++;
+                }
+
+                // Mostrar estadísticas
+                const estimatedPercentage = Math.round((matchCount / sampleChecks) * 100);
+                document.getElementById('preview-stats').innerHTML = `
+                    <div style="margin-bottom: 5px;"><strong>Elementos objetivo:</strong> ${targetElements.length}</div>
+                    <div style="margin-bottom: 5px;"><strong>Elementos referencia:</strong> ${referenceElements.length}</div>
+                    <div style="color: ${estimatedPercentage > 50 ? '#27ae60' : '#e74c3c'}">
+                        <strong>Estimación de coincidencias:</strong> ${estimatedPercentage}%
+                    </div>
+                    <small>(Basado en muestra de ${sampleChecks} elementos)</small>
+                `;
+            }
+
+            // 8. Aplicar selección por relación
+            document.getElementById('apply-relation-btn').addEventListener('click', function() {
+                applySpatialRelationSelection();
+            });
+
+            function applySpatialRelationSelection() {
+                const targetLayerName = document.getElementById('target-layer-select').value;
+                const referenceLayerName = document.getElementById('reference-layer-select').value;
+                const relationType = document.getElementById('relation-type-select').value;
+                const selectionMode = document.getElementById('selection-mode').value;
+                const distance = relationType === 'near' ? parseFloat(document.getElementById('distance-input').value) : null;
+
+                if (!targetLayerName || !referenceLayerName) {
+                    alert('Por favor, seleccione ambas capas.');
+                    return;
+                }
+
+                // Limpiar highlights anteriores
+                clearRelationHighlights();
+
+                // Obtener elementos
+                const targetElements = getLayerElements(targetLayerName);
+                const referenceElements = getLayerElements(referenceLayerName);
+
+                if (targetElements.length === 0 || referenceElements.length === 0) {
+                     document.getElementById('relation-results').innerHTML = 
+                        `<div style="color: #e74c3c; padding: 10px;">Una o ambas capas no contienen elementos seleccionables.</div>`;
+                    return;
+                }
+
+                // Aplicar modo de selección
+                if (selectionMode === 'new') {
+                    // Limpiar selección actual
+                    document.getElementById('limpiarSeleccion').click();
+                }
+
+                let processedCount = 0;
+                let newSelectedCount = 0;
+                const totalToProcess = targetElements.length;
+                
+                document.getElementById('relation-results').innerHTML = `<div style="padding:10px;">Procesando...</div>`;
+
+                // Procesar elementos (Usamos setTimeout para no bloquear la UI)
+                setTimeout(() => {
+                    targetElements.forEach(targetElement => {
+                        processedCount++;
+                        
+                        // Verificar contra todos los elementos de referencia
+                        let matchesAny = false;
+                        for (const refElement of referenceElements) {
+                            if (checkSpatialRelation(targetElement, refElement, relationType, distance)) {
+                                matchesAny = true;
+                                break;
+                            }
+                        }
+
+                        // Aplicar selección según el modo y resultado
+                        if (matchesAny) {
+                            if (selectionMode === 'remove') {
+                                // Remover si está seleccionado
+                                const index = seleccionActual.indexOf(targetElement);
+                                if (index > -1) {
+                                    seleccionActual.splice(index, 1);
+                                    if (targetElement instanceof L.Marker) targetElement.setIcon(targetElement.originalIcon);
+                                    else if (targetElement.setStyle) targetElement.setStyle(targetElement.originalStyle);
+                                }
+                            } else {
+                                // Agregar selección (si no está ya)
+                                if (!seleccionActual.includes(targetElement)) {
+                                    seleccionActual.push(targetElement);
+                                    newSelectedCount++;
+                                    
+                                    // Aplicar estilo de selección
+                                    if (targetElement instanceof L.Marker) {
+                                        targetElement.setIcon(selectedIcon);
+                                    } else if(targetElement.setStyle) {
+                                        targetElement.setStyle({
+                                            color: '#ffff00',
+                                            weight: 5,
+                                            fillOpacity: 0.5
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Actualizar contador
+                    document.getElementById('selected-count').textContent = seleccionActual.length;
+
+                    // Mostrar resultados
+                    document.getElementById('relation-results').innerHTML = `
+                        <div style="padding: 10px;">
+                            <h6 style="margin-top: 0; color: var(--primary-color);">Resultados de Selección</h6>
+                            <div><strong>Procesados:</strong> ${processedCount} elementos</div>
+                            <div><strong>${selectionMode === 'remove' ? 'Removidos' : 'Nuevos seleccionados'}:</strong> ${newSelectedCount} elementos</div>
+                            <div><strong>Total seleccionados:</strong> ${seleccionActual.length} elementos</div>
+                            <div style="margin-top: 10px; color: #27ae60;">
+                                <i class="fas fa-check-circle"></i> Selección aplicada correctamente
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Resaltar elementos seleccionados visualmente en el mapa
+                    highlightSelectedElements();
+                    
+                }, 100);
+            }
+            
+            // 10. Resaltar elementos seleccionados en el mapa
+            function highlightSelectedElements() {
+                // Limpiar highlights anteriores
+                clearRelationHighlights();
+                
+                // Agregar highlights a los seleccionados para dar efecto visual temporal
+                seleccionActual.forEach(element => {
+                    if(element.toGeoJSON) {
+                        const highlightLayer = L.geoJson(element.toGeoJSON(), {
+                            style: {
+                                color: '#ff00ff',
+                                weight: 4,
+                                fillOpacity: 0.3,
+                                className: 'relation-selected'
+                            },
+                             pointToLayer: (feature, latlng) => {
+                                return L.circleMarker(latlng, {
+                                    radius: 10,
+                                    fillColor: "#ff00ff",
+                                    color: "#fff",
+                                    weight: 2,
+                                    opacity: 1,
+                                    fillOpacity: 0.8,
+                                    className: 'relation-selected'
+                                });
+                            }
+                        }).addTo(map);
+                        relationHighlightLayers.push(highlightLayer);
+                    }
+                });
+            }
+
+            // 11. Limpiar highlights
+            function clearRelationHighlights() {
+                relationHighlightLayers.forEach(layer => {
+                    if (layer && map.hasLayer(layer)) {
+                        map.removeLayer(layer);
+                    }
+                });
+                relationHighlightLayers = [];
+            }
+            
+            // 12. Botón limpiar solo selección por relación
+            document.getElementById('clear-relation-selection').addEventListener('click', function() {
+                // Limpiar highlights
+                clearRelationHighlights();
+                // Limpiar selección completa usando la función existente
+                document.getElementById('limpiarSeleccion').click();
+                
+                document.getElementById('relation-results').innerHTML = `
+                    <div style="padding: 10px; color: #27ae60;">
+                        <i class="fas fa-check-circle"></i> Selección limpiada
+                    </div>
+                `;
+            });
+
+            // 13. Cerrar modal
+            document.querySelector('.close-modal').addEventListener('click', function() {
+                document.getElementById('relation-selector-modal').classList.add('hidden');
+                clearRelationHighlights();
+            });
+
+            // Cerrar modal haciendo clic fuera
+            document.getElementById('relation-selector-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                    clearRelationHighlights();
+                }
             });
 
             loadDynamicLayers();
