@@ -1,8 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "VISADOS 2026",
-"features": [
-{ "type": "Feature", "properties": { "Name": "TAD-26-001" }, "geometry": { "type": "Point", "coordinates": [ -63.7084257, -32.6975703 ] } },
-{ "type": "Feature", "properties": { "Name": "TAD-26-002" }, "geometry": { "type": "Point", "coordinates": [ -64.3810927, -32.391977 ] } }
-]
-}
