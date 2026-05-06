@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor Geográfico Profesional</title>
+    <!-- Leaflet CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg-dark: #1e293b;
+            --bg-panel: #0f172a;
+            --bg-light: #f8fafc;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --border: #334155;
+            --radius: 8px;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; background: var(--bg-light); overflow: hidden; }
+
+        /* TOPBAR */
+        #topbar {
+            background: var(--bg-dark); color: var(--text-main); padding: 0.6rem 1rem;
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+            border-bottom: 1px solid var(--border); z-index: 1000;
+        }
+        .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .search-box { display: flex; gap: 0.4rem; flex: 1; max-width: 450px; }
+        .search-box input {
+            flex: 1; padding: 0.4rem 0.8rem; border-radius: var(--radius); border: 1px solid var(--border);
+            background: var(--bg-panel); color: var(--text-main); font-size: 0.85rem;
+        }
+        .search-box input::placeholder { color: var(--text-muted); }
+        .btn {
+            padding: 0.4rem 0.8rem; border-radius: var(--radius); border: none; cursor: pointer;
+            font-size: 0.8rem; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-ghost { background: transparent; color: var(--text-main); border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--border); }
+        .auth-buttons { display: flex; gap: 0.5rem; }
+
+        /* MAIN LAYOUT */
+        #main-container { display: flex; flex: 1; position: relative; }
+        #map { flex: 1; z-index: 1; }
+
+        /* SIDEBAR COMPACTA */
+        #sidebar {
+            width: 260px; background: var(--bg-dark); color: var(--text-main); padding: 0.8rem;
+            overflow-y: auto; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.8rem;
+            transition: transform 0.3s ease;
+        }
+        .panel-section { background: var(--bg-panel); padding: 0.6rem; border-radius: var(--radius); border: 1px solid var(--border); }
+        .panel-section h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .panel-section h3::after { content: '▼'; font-size: 0.6rem; transition: transform 0.2s; }
+        .panel-section.collapsed h3::after { transform: rotate(-90deg); }
+        .panel-section.collapsed .panel-content { display: none; }
+
+        .form-row { margin-bottom: 0.4rem; }
+        .form-row label { font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem; }
+        .form-row select, .form-row input[type="number"], .form-row input[type="text"] {
+            width: 100%; padding: 0.35rem; font-size: 0.75rem; background: var(--bg-dark); color: var(--text-main);
+            border: 1px solid var(--border); border-radius: 4px;
+        }
+        .stats { font-size: 0.7rem; color: var(--text-muted); margin: 0.3rem 0; text-align: center; }
+
+        .tools-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+        .tool-btn {
+            background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-main);
+            padding: 0.4rem; font-size: 0.7rem; border-radius: 4px; cursor: pointer; text-align: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2rem;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover { background: var(--accent); border-color: var(--accent); color: white; }
+        .tool-btn.active { background: var(--accent); border-color: white; color: white; box-shadow: 0 0 0 2px var(--accent-hover); }
+        .tool-icon { font-size: 1rem; }
+
+        /* MODALS / OVERLAYS */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6);
+            display: none; align-items: center; justify-content: center; z-index: 2000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--bg-panel); color: var(--text-main); padding: 1.2rem; border-radius: var(--radius);
+            width: 90%; max-width: 450px; box-shadow: var(--shadow); border: 1px solid var(--border);
+        }
+        .modal h2 { font-size: 1rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+        .close-modal { position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; }
+
+        /* ICON PREVIEW */
+        .icon-selector { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.3rem; }
+        .icon-opt { font-size: 1rem; padding: 0.2rem; cursor: pointer; border-radius: 4px; transition: transform 0.2s; }
+        .icon-opt:hover { transform: scale(1.3); background: var(--bg-dark); }
+        .icon-opt.selected { background: var(--accent); border-radius: 50%; padding: 0.1rem 0.3rem; }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; left: 0; top: 50px; height: calc(100% - 50px); transform: translateX(-100%); z-index: 999; }
+            #sidebar.open { transform: translateX(0); }
+            .mobile-toggle { display: block !important; }
+        }
+        .mobile-toggle { display: none; background: transparent; border: none; color: white; font-size: 1.3rem; cursor: pointer; margin-right: 0.5rem; }
+        .leaflet-container { background: #111; }
+    </style>
+</head>
+<body>
+
+    <!-- TOPBAR -->
+    <header id="topbar">
+        <div style="display:flex; align-items:center;">
+            <button class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+            <div class="logo">🌍 Visor Geográfico Profesional</div>
+        </div>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Buscar ciudad, dirección o lugar...">
+            <button class="btn btn-primary" id="searchBtn">🔍 Ir</button>
+        </div>
+        <div class="auth-buttons">
+            <button class="btn btn-ghost" onclick="openModal('loginModal')">Ingresar</button>
+            <button class="btn btn-primary" onclick="openModal('registerModal')">Registrarse</button>
+        </div>
+    </header>
+
+    <!-- MAIN -->
+    <div id="main-container">
+        <!-- SIDEBAR -->
+        <aside id="sidebar">
+            <div class="panel-section">
+                <h3 onclick="togglePanel(this)">Herramientas GIS</h3>
+                <div class="panel-content">
+                    <div class="form-row">
+                        <label>Capa / Campo</label>
+                        <select id="layerSelect"><option>Todas las capas</option><option>Parcelas</option><option>Vías</option><option>Edificios</option></select>
+                        <select id="fieldSelect" style="margin-top:4px;"><option>Todos los campos</option><option>ID</option><option>Nombre</option><option>Área</option></select>
+                    </div>
+                    <div class="stats">Seleccionados: <span id="selCount">0</span> | Total: <span id="totalCount">0</span></div>
+                    <div style="display:flex; gap:0.3rem; margin-top:0.4rem;">
+                        <button class="btn btn-ghost" style="flex:1;">⬇ Descargar KML</button>
+                        <button class="btn btn-ghost" style="flex:1;">🗑 Limpiar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 onclick="togglePanel(this)">Personalizar Iconos</h3>
+                <div class="panel-content">
+                    <label style="font-size:0.7rem; color:var(--text-muted)">Seleccione una capa</label>
+                    <div class="icon-selector" id="iconGrid">
+                        <span class="icon-opt selected" data-icon="🏠">🏠</span>
+                        <span class="icon-opt" data-icon="🏫">🏫</span>
+                        <span class="icon-opt" data-icon="🏥">🏥</span>
+                        <span class="icon-opt" data-icon="🏪">🏪</span>
+                        <span class="icon-opt" data-icon="🌳">🌳</span>
+                        <span class="icon-opt" data-icon="🚆">🚆</span>
+                        <span class="icon-opt" data-icon="🏢">🏢</span>
+                        <span class="icon-opt" data-icon="🚗">🚗</span>
+                        <span class="icon-opt" data-icon="🚩">🚩</span>
+                        <span class="icon-opt" data-icon="⭐">⭐</span>
+                    </div>
+                    <button class="btn btn-primary" style="width:100%; margin-top:0.5rem;">Aplicar Icono</button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 onclick="togglePanel(this)">Herramientas de Mapa</h3>
+                <div class="panel-content">
+                    <div class="tools-grid">
+                        <button class="tool-btn" onclick="activateTool(this,'info')"><span class="tool-icon">ℹ️</span>Info</button>
+                        <button class="tool-btn" onclick="activateTool(this,'dist')"><span class="tool-icon">📏</span>Distancia</button>
+                        <button class="tool-btn" onclick="activateTool(this,'area')"><span class="tool-icon">📐</span>Área</button>
+                        <button class="tool-btn" onclick="activateTool(this,'coord')"><span class="tool-icon">📍</span>Coordenada</button>
+                        <button class="tool-btn" onclick="activateTool(this,'buffer')"><span class="tool-icon">🔵</span>Buffer</button>
+                        <button class="tool-btn" onclick="openModal('relationModal')"><span class="tool-icon">🔗</span>Relación</button>
+                    </div>
+                    <div class="tools-grid" style="margin-top:0.4rem;">
+                        <button class="tool-btn" onclick="openModal('transformModal')"><span class="tool-icon">🔄</span>Transformar</button>
+                        <button class="tool-btn" onclick="activateTool(this,'clear')"><span class="tool-icon">🧹</span>Limpiar</button>
+                        <button class="tool-btn" onclick="alert('Función: Imprimir mapa')"><span class="tool-icon">🖨️</span>Imprimir</button>
+                        <button class="tool-btn" onclick="document.getElementById('fileInput').click()"><span class="tool-icon">📂</span>Cargar</button>
+                        <button class="tool-btn" onclick="openModal('coordModal')"><span class="tool-icon">🎯</span>Ir a Coord.</button>
+                        <button class="tool-btn" onclick="alert('Más info del proyecto...')"><span class="tool-icon">📖</span>Más Info</button>
+                    </div>
+                    <input type="file" id="fileInput" style="display:none;" accept=".shp,.geojson,.kml,.csv">
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Usuarios Conectados</h3>
+                <div class="panel-content">
+                    <div class="stats" id="usersConnected">🟢 3 usuarios activos</div>
+                </div>
+            </div>
+            
+            <button class="btn btn-ghost" style="margin-top:auto; width:100%;" onclick="alert('Cerrando sesión...')">🚪 Cerrar Sesión</button>
+        </aside>
+
+        <!-- MAP -->
+        <div id="map"></div>
+    </div>
+
+    <!-- MODALS -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal">
+            <h2>Ingresar</h2>
+            <input type="text" placeholder="Email" style="width:100%; padding:0.4rem; margin-bottom:0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:white;">
+            <input type="password" placeholder="Contraseña" style="width:100%; padding:0.4rem; margin-bottom:0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:white;">
+            <button class="btn btn-primary" style="width:100%;">Entrar</button>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:0.5rem;">¿No tienes cuenta? <a href="#" onclick="closeModal('loginModal'); openModal('registerModal')" style="color:var(--accent);">Regístrate aquí</a></p>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="registerModal">
+        <div class="modal">
+            <h2>Crear Cuenta</h2>
+            <input type="text" placeholder="Nombre completo" style="width:100%; padding:0.4rem; margin-bottom:0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:white;">
+            <input type="email" placeholder="Email" style="width:100%; padding:0.4rem; margin-bottom:0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:white;">
+            <input type="password" placeholder="Contraseña" style="width:100%; padding:0.4rem; margin-bottom:0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:white;">
+            <button class="btn btn-primary" style="width:100%;">Registrarse</button>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:0.5rem;">¿Ya tienes cuenta? <a href="#" onclick="closeModal('registerModal'); openModal('loginModal')" style="color:var(--accent);">Ingresa aquí</a></p>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="relationModal">
+        <div class="modal" style="max-width:500px;">
+            <h2>Selección por Relación Espacial</h2>
+            <div class="form-row"><label>Capa Objetivo</label><select><option>Seleccione una capa...</option><option>Parcelas</option><option>Vías</option></select></div>
+            <div class="form-row"><label>Capa Referencia</label><select><option>Seleccione una capa...</option><option>Barrios</option><option>Departamentos</option></select></div>
+            <div class="form-row"><label>Tipo de Relación</label>
+                <select>
+                    <option>INTERSECTA - Se tocan o superponen</option>
+                    <option>CONTENIDO DENTRO - Totalmente dentro</option>
+                    <option>DENTRO DE - La referencia contiene al objetivo</option>
+                    <option>DISJUNTO - No se tocan</option>
+                    <option>TOCA - Comparte borde pero no interior</option>
+                    <option>CRUZA - Atraviesa (línea-polígono)</option>
+                    <option>SUPERPONE - Mismo tipo, parcialmente superpuestos</option>
+                    <option>PRÓXIMO - Dentro de distancia específica</option>
+                </select>
+            </div>
+            <div class="form-row"><label>Distancia máxima (metros) [Solo PRÓXIMO]</label><input type="number" value="500"></div>
+            <div class="form-row"><label>Modo de Selección</label>
+                <select><option>Nueva Selección</option><option>Agregar a selección actual</option><option>Remover de selección actual</option></select>
+            </div>
+            <div class="stats" style="background:var(--bg-dark); padding:0.5rem; border-radius:4px; margin:0.5rem 0;">Vista Previa: Seleccione capas para ver estadísticas</div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModal('relationModal')">Cerrar</button>
+                <button class="btn btn-primary" onclick="alert('Aplicando selección espacial...'); closeModal('relationModal')">Aplicar Selección</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="transformModal">
+        <div class="modal">
+            <h2>Transformación de Coordenadas</h2>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;">Ingrese coordenadas geográficas (Lat/Lon) para transformar.</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+                <div class="form-row"><label>Latitud</label><input type="number" step="any" placeholder="-34.6037"></div>
+                <div class="form-row"><label>Longitud</label><input type="number" step="any" placeholder="-58.3816"></div>
+            </div>
+            <div class="form-row">
+                <label>Sistema Origen</label>
+                <select><option>WGS84 (Geográficas)</option><option>Gauss Kruger (POSGAR 07)</option></select>
+            </div>
+            <div class="form-row">
+                <label>Faja POSGAR</label>
+                <select><option>Faja 1 (MC: -72°)</option><option>Faja 2 (MC: -69°)</option><option>Faja 3 (MC: -66°)</option><option>Faja 4 (MC: -63°)</option><option>Faja 5 (MC: -60°)</option><option>Faja 6 (MC: -57°)</option><option>Faja 7 (MC: -54°)</option></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModal('transformModal')">Cerrar</button>
+                <button class="btn btn-primary" onclick="alert('Transformando coordenadas...'); closeModal('transformModal')">Transformar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="coordModal">
+        <div class="modal">
+            <h2>Ir a Coordenada</h2>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+                <div class="form-row"><label>Latitud</label><input type="number" step="any" placeholder="-34.6037"></div>
+                <div class="form-row"><label>Longitud</label><input type="number" step="any" placeholder="-58.3816"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModal('coordModal')">Cerrar</button>
+                <button class="btn btn-primary" onclick="flyToCoords()">Ir a Ubicación</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // INIT MAP
+        const map = L.map('map').setView([-34.6037, -58.3816], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // SEARCH FUNCTIONALITY (Nominatim)
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            if (!query) return;
+            
+            searchBtn.textContent = '⏳';
+            searchBtn.disabled = true;
+
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`, {
+                    headers: { 'User-Agent': 'VisorGeoProfesional/1.0' }
+                });
+                const data = await res.json();
+                if (data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    map.flyTo([lat, lon], 15);
+                    L.marker([lat, lon]).addTo(map).bindPopup(`📍 ${query}`).openPopup();
+                } else {
+                    alert('No se encontraron resultados para la búsqueda.');
+                }
+            } catch (err) {
+                console.error('Error en búsqueda:', err);
+                alert('Error al conectar con el servicio de geocodificación.');
+            } finally {
+                searchBtn.textContent = '🔍';
+                searchBtn.disabled = false;
+            }
+        }
+
+        searchBtn.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
+
+        // UI INTERACTIONS
+        function togglePanel(header) {
+            header.parentElement.classList.toggle('collapsed');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // Close modal on outside click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.remove('active');
+            });
+        });
+
+        // ICON SELECTOR
+        document.querySelectorAll('.icon-opt').forEach(icon => {
+            icon.addEventListener('click', () => {
+                document.querySelectorAll('.icon-opt').forEach(i => i.classList.remove('selected'));
+                icon.classList.add('selected');
+            });
+        });
+
+        // TOOL ACTIVATION
+        let activeTool = null;
+        function activateTool(btn, tool) {
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            if (activeTool === tool) {
+                activeTool = null;
+                return;
+            }
+            activeTool = tool;
+            btn.classList.add('active');
+            // Aquí integrarías la lógica real de cada herramienta GIS
+            console.log(`Herramienta activada: ${tool}`);
+        }
+
+        function flyToCoords() {
+            const inputs = document.querySelectorAll('#coordModal input');
+            const lat = parseFloat(inputs[0].value);
+            const lon = parseFloat(inputs[1].value);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                map.flyTo([lat, lon], 15);
+                closeModal('coordModal');
+            } else {
+                alert('Por favor ingrese coordenadas válidas.');
+            }
+        }
+
+        // MOCK STATS UPDATE
+        setInterval(() => {
+            const users = Math.floor(Math.random() * 3) + 2;
+            document.getElementById('usersConnected').textContent = `🟢 ${users} usuarios activos`;
+        }, 5000);
+    </script>
+</body>
+</html>
