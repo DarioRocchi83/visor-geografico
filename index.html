@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor Geográfico Profesional</title>
+    
+    <!-- LIBRERÍAS ORIGINALES -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Geoman (Dibujo y Edición) -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+    
+    <!-- NUEVA LIBRERÍA: Buscador de Direcciones -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <!-- Utilidades GIS y Archivos -->
+    <script src="https://cdn.jsdelivr.net/npm/tokml@0.4.0/tokml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.7.5/dist/proj4.js"></script>
+    <script src="https://unpkg.com/@tmcw/togeojson@5.2.2/dist/togeojson.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- ESTILOS ORIGINALES COMPLETOS -->
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --dark-color: #1a252f;
+            --light-color: #ecf0f1;
+            --panel-bg: rgba(255, 255, 255, 0.95);
+            --shadow: 0 4px 20px rgba(0,0,0,0.15);
+            --border-radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f8f9fa; overflow: hidden; height: 100vh; }
+        
+        /* Autenticación */
+        #auth-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .auth-form-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); text-align: center; width: 350px; animation: fadeIn 0.5s ease-out; }
+        .auth-form-box h2 { margin-top: 0; color: #333; font-weight: 600; margin-bottom: 25px; }
+        .auth-form-box input { width: 100%; padding: 14px; margin-bottom: 20px; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 16px; }
+        .auth-form-box button { width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; }
+        .auth-error { color: #e63946; margin-top: 10px; font-size: 14px; }
+        .switch-form-link { color: #667eea; cursor: pointer; text-decoration: none; margin-top: 15px; display: inline-block; }
+        
+        /* Mapa y Paneles */
+        #visor-container { display: none; height: 100vh; width: 100%; position: relative; }
+        #map { height: 100%; width: 100%; z-index: 1; }
+        .custom-panel { z-index: 1000; background: var(--panel-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); position: absolute; transition: all 0.3s ease; }
+        #tools-panel { top: 20px; left: 20px; width: 350px; max-height: calc(100vh - 40px); overflow-y: auto; }
+        #analysis-panel { top: 20px; right: 20px; width: 350px; max-height: 80vh; overflow-y: auto; }
+        
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; border-radius: var(--border-radius) var(--border-radius) 0 0; cursor: move; }
+        .panel-content { padding: 20px; }
+        .custom-panel.collapsed .panel-content { display: none; }
+        
+        .panel-content input, .panel-content select, .panel-content button { width: 100%; margin-bottom: 15px; padding: 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px; }
+        .panel-content button { background: linear-gradient(135deg, var(--secondary-color), #2980b9); color: white; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        
+        /* Grilla GIS */
+        .gis-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }
+        .gis-tool-btn { background: #f8f9fa; border: 1px solid #dee2e6; color: #495057; padding: 12px 5px; border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; display: flex; flex-direction: column; align-items: center; }
+        .gis-tool-btn:hover { background: #e9ecef; transform: translateY(-2px); }
+        .gis-tool-btn.active-tool { background: var(--secondary-color) !important; color: white !important; }
+
+        /* Estilo Buscador Direcciones */
+        .leaflet-control-geocoder { border-radius: 8px !important; box-shadow: var(--shadow) !important; border: none !important; margin-top: 15px !important; }
+
+        /* Modal Relación */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 12px; width: 500px; }
+        
+        /* Panel Usuarios */
+        #users-panel { position: absolute; bottom: 20px; right: 20px; width: 280px; max-height: 48px; overflow: hidden; }
+        #users-panel:hover { max-height: 250px; }
+        #users-list li { padding: 8px 10px; font-size: 13px; list-style: none; display: flex; align-items: center; }
+        #users-list li::before { content: '●'; color: #28a745; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <!-- Autenticación -->
+    <div id="auth-container">
+        <div class="auth-form-box">
+            <form id="login-form">
+                <h2><i class="fas fa-map-marked-alt"></i> Visor Geográfico</h2>
+                <input type="email" id="login-email" placeholder="Correo electrónico" required>
+                <input type="password" id="login-password" placeholder="Contraseña" required>
+                <button type="submit">Ingresar</button>
+                <p id="login-error" class="auth-error"></p>
+                <p class="switch-form-link" id="show-register">¿No tienes cuenta? Regístrate aquí</p>
+            </form>
+            <form id="register-form" class="hidden">
+                <h2><i class="fas fa-user-plus"></i> Crear Cuenta</h2>
+                <input type="email" id="register-email" placeholder="Correo electrónico" required>
+                <input type="password" id="register-password" placeholder="Contraseña" required>
+                <button type="submit">Registrarse</button>
+                <p id="register-error" class="auth-error"></p>
+                <p class="switch-form-link" id="show-login">¿Ya tienes cuenta? Ingresa aquí</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Visor -->
+    <div id="visor-container">
+        <!-- Panel Herramientas -->
+        <div id="tools-panel" class="custom-panel">
+            <div class="panel-header"><h4><i class="fas fa-tools"></i> Herramientas GIS</h4><span class="toggle-btn">-</span></div>
+            <div class="panel-content">
+                <input type="text" id="buscador" placeholder="Buscar en capas locales...">
+                
+                <!-- BOTÓN BUSCADOR DIRECCIONES -->
+                <button id="btn-buscar-dir-manual" style="background: var(--secondary-color);"><i class="fas fa-search-location"></i> Buscar Dirección / Ciudad</button>
+
+                <div class="element-counter" style="font-size: 12px; text-align: center; margin-bottom: 10px;">
+                    Seleccionados: <span id="selected-count">0</span> | Total: <span id="total-count">0</span>
+                </div>
+
+                <div class="gis-tools">
+                    <div class="gis-tool-btn" id="info-parcela"><i class="fas fa-info-circle"></i>Info Parcela</div>
+                    <div class="gis-tool-btn" id="measure-distance"><i class="fas fa-ruler"></i>Distancia</div>
+                    <div class="gis-tool-btn" id="measure-area"><i class="fas fa-draw-polygon"></i>Área</div>
+                    <div class="gis-tool-btn" id="mark-coords"><i class="fas fa-map-marker-alt"></i>Coordenada</div>
+                    <div class="gis-tool-btn" id="create-buffer"><i class="fas fa-bullseye"></i>Buffer</div>
+                    <div class="gis-tool-btn" id="select-by-relation"><i class="fas fa-layer-group"></i>Relación</div>
+                    <div class="gis-tool-btn" id="transform-coords"><i class="fas fa-exchange-alt"></i>Transformar</div>
+                    <div class="gis-tool-btn" id="clear-drawings"><i class="fas fa-eraser"></i>Limpiar</div>
+                    <div class="gis-tool-btn" id="print-map"><i class="fas fa-print"></i>Imprimir</div>
+                    <div class="gis-tool-btn" id="cargar-capa-btn"><i class="fas fa-file-upload"></i>Cargar</div>
+                </div>
+
+                <div id="icon-personalization" style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                    <select id="layer-icon-selector"><option value="">Seleccione capa para icono</option></select>
+                    <div id="icon-options" style="display: flex; justify-content: space-around; font-size: 20px; margin-top: 5px;">
+                        <span class="icon-option" data-icon="🏠" style="cursor:pointer">🏠</span>
+                        <span class="icon-option" data-icon="📍" style="cursor:pointer">📍</span>
+                        <span class="icon-option" data-icon="🏢" style="cursor:pointer">🏢</span>
+                        <span class="icon-option" data-icon="🌳" style="cursor:pointer">🌳</span>
+                    </div>
+                    <button id="apply-icon-btn" style="margin-top:10px; height: 35px; padding: 0;">Aplicar</button>
+                </div>
+
+                <button id="descargarSeleccion" style="margin-top: 15px; background: #27ae60;">Descargar KML</button>
+                <button id="logout-button">Cerrar Sesión</button>
+            </div>
+        </div>
+
+        <!-- Panel Análisis (Transformación) -->
+        <div id="analysis-panel" class="custom-panel hidden">
+            <div class="panel-header"><h4>Transformación</h4><span class="toggle-btn">-</span></div>
+            <div class="panel-content">
+                <input type="text" id="source-lat" placeholder="Latitud" value="-31.41">
+                <input type="text" id="source-lng" placeholder="Longitud" value="-64.18">
+                <select id="faja-selector">
+                    <option value="4">Faja 4 (POSGAR 07)</option>
+                </select>
+                <button id="transform-btn">Convertir a X/Y</button>
+                <div id="coord-result" style="padding:10px; background:#eee; font-size:12px;"></div>
+            </div>
+        </div>
+
+        <!-- Modal Relación -->
+        <div id="relation-selector-modal" class="modal-overlay hidden">
+            <div class="modal-content custom-panel">
+                <div class="panel-header"><h4>Selección Espacial</h4><span class="close-modal" style="cursor:pointer">&times;</span></div>
+                <div class="panel-content">
+                    <label>Capa Objetivo:</label><select id="target-layer-select"></select>
+                    <label>Capa Referencia:</label><select id="reference-layer-select"></select>
+                    <label>Relación:</label>
+                    <select id="relation-type-select">
+                        <option value="intersects">Interseca</option>
+                        <option value="contains">Contenido en</option>
+                    </select>
+                    <button id="apply-relation-btn" style="margin-top: 15px;">Ejecutar Selección</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios -->
+        <div id="users-panel" class="custom-panel">
+            <div class="panel-header"><h4>Conectados</h4></div>
+            <div class="panel-content"><ul id="users-list"></ul></div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <script type="module">
+        // --- LÓGICA FIREBASE, PROJ4 Y ORIGINAL ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        
+        const firebaseConfig = { 
+            apiKey: "AIzaSyDCe3gLAbQsn1kBh-nRnKu8dXelIs_GmhY", 
+            authDomain: "visor-geografico-presencia.firebaseapp.com", 
+            databaseURL: "https://visor-geografico-presencia-default-rtdb.firebaseio.com", 
+            projectId: "visor-geografico-presencia", 
+            appId: "1:761855239344:web:1d5b9ce48d5997bb90c775"
+        };
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+
+        // Proyecciones
+        proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
+        proj4.defs("POSGAR07_F4", "+proj=tmerc +lat_0=-90 +lon_0=-63 +k=1 +x_0=4500000 +y_0=0 +ellps=GRS80 +units=m +no_defs");
+
+        let map, geocoderControl;
+        let allFeatures = [], mainLayerGroups = {}, seleccionActual = [];
+        let userLoadedLayersGroup = L.featureGroup();
+        const GITHUB_USER = 'DarioRocchi83';
+        const GITHUB_REPO = 'visor-geografico';
+
+        // Auth
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                document.getElementById('auth-container').classList.add('hidden');
+                document.getElementById('visor-container').style.display = 'block';
+                if (!map) inicializarMapa();
+                const uRef = ref(database, `connected_users/${user.uid}`);
+                set(uRef, { name: user.email, connected_at: serverTimestamp() });
+                onDisconnect(uRef).remove();
+            } else {
+                document.getElementById('auth-container').classList.remove('hidden');
+            }
+        });
+
+        onValue(ref(database, 'connected_users'), snap => {
+            const list = document.getElementById('users-list');
+            list.innerHTML = '';
+            const users = snap.val();
+            if (users) Object.values(users).forEach(u => {
+                const li = document.createElement('li'); li.textContent = u.name; list.appendChild(li);
+            });
+        });
+
+        function inicializarMapa() {
+            map = L.map('map', { center: [-31.417, -64.183], zoom: 14 });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            userLoadedLayersGroup.addTo(map);
+
+            // --- 1. BUSCADOR INTEGRADO ---
+            geocoderControl = L.Control.geocoder({
+                defaultMarkGeocode: false,
+                placeholder: "Buscar ciudad o dirección...",
+                position: 'topright'
+            }).on('markgeocode', function(e) {
+                const latlng = e.geocode.center;
+                map.setView(latlng, 17);
+                L.marker(latlng).addTo(userLoadedLayersGroup).bindPopup(e.geocode.name).openPopup();
+            }).addTo(map);
+
+            document.getElementById('btn-buscar-dir-manual').onclick = () => {
+                document.querySelector('.leaflet-control-geocoder-icon').click();
+            };
+
+            // --- 2. HERRAMIENTAS ORIGINALES ---
+            map.pm.addControls({ position: 'topleft', drawMarker: true, drawPolygon: true, removalMode: true });
+
+            loadGitHubLayers();
+
+            // Transformación
+            document.getElementById('transform-coords').onclick = () => document.getElementById('analysis-panel').classList.toggle('hidden');
+            document.getElementById('transform-btn').onclick = () => {
+                const lat = parseFloat(document.getElementById('source-lat').value);
+                const lng = parseFloat(document.getElementById('source-lng').value);
+                const res = proj4("EPSG:4326", "POSGAR07_F4", [lng, lat]);
+                document.getElementById('coord-result').innerHTML = `X: ${res[0].toFixed(2)} Y: ${res[1].toFixed(2)}`;
+            };
+
+            // Relación
+            document.getElementById('select-by-relation').onclick = () => {
+                const targetS = document.getElementById('target-layer-select');
+                const refS = document.getElementById('reference-layer-select');
+                targetS.innerHTML = refS.innerHTML = '';
+                Object.keys(mainLayerGroups).forEach(n => {
+                    targetS.innerHTML += `<option value="${n}">${n}</option>`;
+                    refS.innerHTML += `<option value="${n}">${n}</option>`;
+                });
+                document.getElementById('relation-selector-modal').classList.remove('hidden');
+            };
+
+            document.getElementById('apply-relation-btn').onclick = () => {
+                const targetL = mainLayerGroups[document.getElementById('target-layer-select').value];
+                const refL = mainLayerGroups[document.getElementById('reference-layer-select').value];
+                targetL.eachLayer(tl => {
+                    refL.eachLayer(rl => {
+                        if(tl.getBounds().intersects(rl.getBounds())) {
+                            tl.setStyle({color: 'yellow', weight: 5});
+                            seleccionActual.push(tl);
+                        }
+                    });
+                });
+                document.getElementById('selected-count').textContent = seleccionActual.length;
+                document.getElementById('relation-selector-modal').classList.add('hidden');
+            };
+
+            // Limpiar
+            document.getElementById('clear-drawings').onclick = () => {
+                userLoadedLayersGroup.clearLayers();
+                map.eachLayer(l => { if(l.pm) l.remove(); });
+            };
+        }
+
+        async function loadGitHubLayers() {
+            const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data`);
+            const files = await res.json();
+            files.forEach(async (f, idx) => {
+                const name = f.name.split('.')[0];
+                const r = await fetch(f.download_url);
+                if(f.name.endsWith('.geojson')) {
+                    const data = await r.json();
+                    const lyr = L.geoJSON(data, {
+                        onEachFeature: (feat, l) => {
+                            l.on('click', () => {
+                                seleccionActual.push(l);
+                                document.getElementById('selected-count').textContent = seleccionActual.length;
+                            });
+                        }
+                    }).addTo(map);
+                    mainLayerGroups[name] = lyr;
+                } else if(f.name.endsWith('.xlsx')) {
+                    const buf = await r.arrayBuffer();
+                    const wb = XLSX.read(buf);
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    const group = L.featureGroup().addTo(map);
+                    data.forEach(p => { if(p.Latitud) L.marker([p.Latitud, p.Longitud]).addTo(group); });
+                    mainLayerGroups[name] = group;
+                }
+                const opt = document.createElement('option'); opt.value = name; opt.textContent = name;
+                document.getElementById('layer-icon-selector').appendChild(opt);
+                updateTotalCount();
+            });
+        }
+
+        function updateTotalCount() {
+            let total = 0;
+            Object.values(mainLayerGroups).forEach(g => total += g.getLayers().length);
+            document.getElementById('total-count').textContent = total;
+        }
+
+        // UI Original
+        document.querySelectorAll('.panel-header').forEach(h => {
+            h.onmousedown = e => {
+                const p = h.parentElement;
+                let offX = e.clientX - p.offsetLeft, offY = e.clientY - p.offsetTop;
+                document.onmousemove = ev => { p.style.left = ev.clientX - offX + 'px'; p.style.top = ev.clientY - offY + 'px'; };
+                document.onmouseup = () => document.onmousemove = null;
+            }
+        });
+        document.querySelectorAll('.toggle-btn').forEach(b => b.onclick = () => b.closest('.custom-panel').classList.toggle('collapsed'));
+        document.querySelector('.close-modal').onclick = () => document.getElementById('relation-selector-modal').classList.add('hidden');
+        document.getElementById('logout-button').onclick = () => signOut(auth);
+    </script>
+</body>
+</html>
